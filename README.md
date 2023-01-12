@@ -16,7 +16,12 @@ You can also easily compose these methods, so you run a method in a
 docker container started on a remote machine via a batch system.
 
 #2 means there are quite a few restrictions in what changes the method
-can make.  The implementation is not super-sophisticated, so it
+can make.  It also means it's not useful for things like parallel
+execution.
+
+# Limitations
+
+The implementation is not super-sophisticated, so it
 should really only modify the object's state.
 
 # Installation
