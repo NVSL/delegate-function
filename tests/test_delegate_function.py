@@ -1,7 +1,7 @@
 from delegate_function import *
 import os
 import pytest
-
+import pwd
 def TrivialNestedDelegate():
     return TrivialDelegate(subdelegate=TrivialDelegate(subdelegate=TrivialDelegate()))
 
@@ -19,6 +19,12 @@ def TestDockerDelegate():
     return DockerDelegate("cfiddle-slurm:21.08.6.1",
                           ("/cse142L","/home/swanson/CSE141pp-Root"))
 
+def SudoTestDelegate():
+    return SudoDelegate(pwd.getpwuid(os.getuid()).pw_name)
+
+def SSHTestDelegate():
+    return SSHDelegate(pwd.getpwuid(os.getuid()).pw_name, "some host")
+
 @pytest.fixture(scope="module",
                 params=[TrivialDelegate,
                         SubprocessDelegate,
@@ -27,13 +33,16 @@ def TestDockerDelegate():
                         MixedNestedDelegate,
                         AlternateDirectorySubprocessDelegate,
                         SlurmDelegate,
-                        TestDockerDelegate
+                        TestDockerDelegate,
+                        SudoTestDelegate,
+                        #SSHTestDelegate,
+                        
                         ])
 def ADelegate(request):
     return request.param
 
 def test_basic(ADelegate):
-    if ADelegate is TrivialDelegate:
+    if ADelegate in [TrivialDelegate, TrivialNestedDelegate]:
         pytest.skip("TrivialDelegate doesn't run in a different process")
     sd = ADelegate()
     f = TestClass()
