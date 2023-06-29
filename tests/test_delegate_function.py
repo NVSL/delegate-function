@@ -15,6 +15,10 @@ def AlternateDirectorySubprocessDelegate():
     os.makedirs(".testing", exist_ok=True)
     return SubprocessDelegate(temporary_file_root=".testing")
 
+def TestDockerDelegate():
+    return DockerDelegate("cfiddle-slurm:21.08.6.1",
+                          ("/cse142L","/home/swanson/CSE141pp-Root"))
+
 @pytest.fixture(scope="module",
                 params=[TrivialDelegate,
                         SubprocessDelegate,
@@ -22,7 +26,8 @@ def AlternateDirectorySubprocessDelegate():
                         SubprocessNestedDelegate,
                         MixedNestedDelegate,
                         AlternateDirectorySubprocessDelegate,
-                        SlurmDelegate
+                        SlurmDelegate,
+                        TestDockerDelegate
                         ])
 def ADelegate(request):
     return request.param

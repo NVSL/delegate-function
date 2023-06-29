@@ -7,6 +7,17 @@ import os
 
 class BaseDelegate:
 
+    """
+    The basic delegate algorithm is:
+    
+    1.  If I have sub-delegate
+        a.  Execute the step of invoking the sub-delegate in my particular way.
+    2.  No sub-delegate?
+        a.  Then execute the function in my particular way.
+    
+    As a consequence this means that the only delegate that should ever access or need the original invocation's arguments is the last delegate in the the chain.
+    
+    """
     def __init__(self, subdelegate=None):
         self._subdelegate = subdelegate
         
@@ -20,7 +31,10 @@ class BaseDelegate:
         self._kwargs = kwargs
         self.do_invoke()
 
+    def do_invoke(self):
+        raise NotImplemented()
         
+
 class TrivialDelegate(BaseDelegate):
 
     def delegated_invoke(self):
@@ -41,12 +55,9 @@ class SubprocessDelegate(BaseDelegate):
         super().__init__(*argc, **kwargs)
         self._temporary_file_root = temporary_file_root
 
-    def _run_process(self):
-        try:
-            log.debug(f"SubprocessDelegate running {self._command}")
-            self._invoke_shell(self._command)
-        except subprocess.CalledProcessError as e:
-            raise DelegateFunctionException(f"SubprocessDelegate failed (error code {e.returncode}): {e.stdout.decode()} {e.stderr.decode()}")
+    def _run_function_in_external_process(self):
+        log.debug(f"SubprocessDelegate running {self._command}")
+        self._invoke_shell(self._command)
         
     def do_invoke(self):
         with tempfile.NamedTemporaryFile(dir=self._temporary_file_root) as delegate_before:
@@ -54,13 +65,12 @@ class SubprocessDelegate(BaseDelegate):
             delegate_before.flush()
             with tempfile.NamedTemporaryFile(dir=self._temporary_file_root) as delegate_after:
                             
-                self._command = ["/opt/conda/bin/delegate-function-run",
-#"delegate-function-run",
+                self._command = ["delegate-function-run",
                                  "--delegate-before", delegate_before.name,
                                  "--delegate-after", delegate_after.name,
                                  "--log-level", str(log.root.level)]
                 
-                self._run_process()
+                self._run_function_in_external_process()
                 after = pickle.load(delegate_after)
 
                 self._obj.__dict__.update(after['delegate']._obj.__dict__)
@@ -73,20 +83,41 @@ class SubprocessDelegate(BaseDelegate):
             log.debug(f"{r.stdout.decode()}")
             log.debug(f"{r.stderr.decode()}")
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Subprocess execution failed: {e} {e.stdout.decode()} {e.stderr.decode()}")
+            raise DelegateFunctionException(f"Delegate subprocess execution failed: {e} {e.stdout.decode()} {e.stderr.decode()}")
 
         
 class SlurmDelegate(SubprocessDelegate):
     def __init__(self):
         super().__init__(temporary_file_root=".")
 
-    def _run_process(self):
-        self._invoke_shell(['salloc', 'srun'] + self._command)
+    def _run_function_in_external_process(self):
+        command = ['salloc', 'srun'] + self._command
+        log.debug(f"SlurmDelegateDelegate running {command}")
+        self._invoke_shell(command)
 
+
+class DockerDelegate(SubprocessDelegate):
+    def __init__(self, docker_image, root_replacement):
+        super().__init__(temporary_file_root=".")
+        self._root_replacement = root_replacement
+        self._docker_image = docker_image
+
+    def _replace_root(self, path):
+        return path.replace(*self._root_replacement)
         
+    def _run_function_in_external_process(self):
+        
+        command = ['docker', 'run',
+                   '--workdir', '/delegate',
+                   '--mount', f'type=bind,source={self._replace_root(os.getcwd())},dst={os.getcwd()}',
+                   self._docker_image] + self._command
+        log.debug(f"SubprocessDelegate running {command}")
+        log.debug(f"SubprocessDelegate running {' '.join(command)}")
+        self._invoke_shell(command)
+
+
 class DelegateFunctionException(Exception):
     pass
-
 
 @click.command()
 @click.option('--delegate-before', required=True, type=click.File("rb"), help="File with the initial state of the delegate.")
@@ -100,7 +131,6 @@ def delegate_function_run(delegate_before, delegate_after, log_level):
     do_delegate_function_run(delegate_before, delegate_after)
     
 def do_delegate_function_run(delegate_before, delegate_after):
-    import platform
     try:
         delegate_object = pickle.load(delegate_before)
     except Exception as e:
