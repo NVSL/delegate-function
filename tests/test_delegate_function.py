@@ -3,74 +3,82 @@ import os
 import pytest
 import pwd
 
-def TestTrivialDelegate(**kwargs):
+def TestTrivialDelegate():
     return TrivialDelegate()
 
-def TestTrivialNestedDelegate(**kwargs):
+def TestTrivialNestedDelegate():
     return TrivialDelegate(subdelegate=TrivialDelegate(subdelegate=TrivialDelegate()))
 
-def TestSubProcessDelegate(**kwargs):
+def TestSubProcessDelegate():
     return SubprocessDelegate()
 
-def TestSubprocessNestedDelegate(**kwargs):
+def TestSubprocessNestedDelegate():
     return SubprocessDelegate(subdelegate=SubprocessDelegate(subdelegate=SubprocessDelegate()))
 
-def TestMixedNestedDelegate(**kwargs):
+def TestMixedNestedDelegate():
     return SubprocessDelegate(subdelegate=TrivialDelegate(subdelegate=SubprocessDelegate()))
 
-def TestAlternateDirectorySubprocessDelegate(**kwargs):
+def TestAlternateDirectorySubprocessDelegate():
     os.makedirs(".testing", exist_ok=True)
     return SubprocessDelegate(temporary_file_root=".testing")
 
-def TestDockerDelegate(**kwargs):
+def TestDockerDelegate():
     return DockerDelegate("cfiddle-slurm:21.08.6.1",
-                          #("/cse142L","/home/swanson/CSE141pp-Root"),
                           temporary_file_root='/cfiddle_scratch/',
-                          **kwargs
                           )
 
-def TestSudoDelegate(**kwargs):
+
+def TestSudoDelegate():
     return SudoDelegate(user=pwd.getpwuid(os.getuid()).pw_name)
 
-def TestSlurmDelegate(**kwargs):
+
+def TestSlurmDelegate():
     return SlurmDelegate()
+
+
+def TestSSHSlurmDelegate():
+    return SSHDelegate("test_fiddler", 
+                       platform.node(), 
+                       subdelegate=TestSlurmDelegate())
+
+def TestSlurmDockerDelegate():
+    return SlurmDelegate(interactive = kwargs.get("interactive", False),
+                         subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
+                                                        ))
 
 import platform
 
-def TestSSHDelegate(**kwargs):
+def TestSSHDelegate():
     return SSHDelegate("test_fiddler", 
                        platform.node(), 
-                       interactive = kwargs.get("interactive", False),
                        subdelegate=TrivialDelegate(subdelegate=TrivialDelegate()))
 
-def TestSSHSudoDockerDelegate(**kwargs):
-    return SSHDelegate(user="test_fiddler", 
-                       host=platform.node(), 
-                       interactive = kwargs.get("interactive", False),
-                       subdelegate=SudoDelegate(user="cfiddle", 
-                                                subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
-                                                                               **kwargs)))
 
-def TestSSHDockerDelegate(**kwargs):
+def TestSSHSudoDockerDelegate():
     return SSHDelegate(user="test_fiddler", 
                        host=platform.node(), 
-                       interactive = kwargs.get("interactive", False),
+                       subdelegate=SudoDelegate(user="cfiddle", 
+                                                subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
+                                                                               )))
+
+def TestSSHDockerDelegate():
+    return SSHDelegate(user="test_fiddler", 
+                       host=platform.node(), 
                        #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
                        #debug_pre_hook=(PDBClass(), "run", [], {}),
                        subdelegate=TestDockerDelegate(
-        #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
-        **kwargs))
+        #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
+        ))
 
-def TestSSHSSHDelegate(**kwargs):
+def TestSSHSSHDelegate():
     return SSHDelegate(user="test_fiddler", 
                        host=platform.node(), 
-                       interactive = kwargs.get("interactive", False),
-                       debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
+                       #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
                        #debug_pre_hook=(PDBClass(), "run", [], {}),
                        subdelegate=SSHDelegate(user="test_fiddler",
                                                 host=platform.node(),
-                                                debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
-                                                **kwargs))
+                                                #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
+                                                ))
 
 
 @pytest.fixture(scope="module",
@@ -86,7 +94,10 @@ def TestSSHSSHDelegate(**kwargs):
                         TestSSHDelegate,
                         TestSSHDockerDelegate,        
                         TestSSHSudoDockerDelegate,
-                        TestSSHSSHDelegate      
+                        TestSSHSSHDelegate,
+                        TestSSHSlurmDelegate,
+                     #   TestSSHSudoSlurmDelegate,
+                        #TestSlurmDockerDelegate
                         ])
 def ADelegate(request):
     return request.param
@@ -101,7 +112,8 @@ def test_basic(ADelegate):
 
 @pytest.mark.slow
 def test_shell(ADelegate):
-    sd = ADelegate(interactive=True)
+    sd = ADelegate()
+    sd.make_interactive()
     f = ShellCommandClass(["bash"])
     sd.invoke(f, "run")
 
@@ -113,4 +125,12 @@ def test_mutable(ADelegate):
     sd.invoke(f, "set_value", 4)
     assert f._value == 4
 
-    
+def test_interactive():
+    sd = TestSSHSudoDockerDelegate()
+    assert not sd._interactive
+    assert not sd._subdelegate._interactive
+    sd.make_interactive()
+    assert sd._interactive
+    assert sd._subdelegate._interactive
+
+                     

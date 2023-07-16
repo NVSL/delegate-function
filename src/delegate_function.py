@@ -29,10 +29,16 @@ class BaseDelegate:
     For some delegates, you may also need to pass :code:`interactive=True` to interact with the shell.
     
     """
-    def __init__(self, subdelegate=None, debug_pre_hook=None):
+    def __init__(self, subdelegate=None, debug_pre_hook=None, interactive=False):
         self._subdelegate = subdelegate
         self._debug_pre_hook = debug_pre_hook
-        
+        self._interactive = False
+        if interactive:
+            self.make_interactive()
+
+    def make_interactive(self):
+        self._make_chain_interactive()
+
     def invoke(self, obj, method, *argc, **kwargs):
         """ 
         The sole public method of this class exceutes :code:`obj.method(*argc, **kwargs)` using the supplied sub-delegates.
@@ -72,6 +78,15 @@ class BaseDelegate:
             getattr(obj, meth)(*argc, **kwargs)
         else:
             log.debug(f"No pre_debug_hook for {self}")
+
+    def _set_interactive(self, interactive):
+        self._interactive = interactive
+
+    def _make_chain_interactive(self):
+        t = self
+        while t is not None:
+            t._set_interactive(True)
+            t = t._subdelegate
 
 class TrivialDelegate(BaseDelegate):
     pass
@@ -174,21 +189,20 @@ class SudoDelegate(SubprocessDelegate):
 
 class SSHDelegate(SubprocessDelegate):
 
-    def __init__(self, user, host, *args, interactive=False, **kwargs):
+    def __init__(self, user, host, *args, **kwargs):
         super().__init__(*args, temporary_file_root=".", **kwargs)
         self._user = user
         self._host = host
-        self._interactive = interactive
-        self._ssh_command = ["ssh", ("-t" if self._interactive else "-T"), f"{self._user}@{self._host}"]
 
     def _run_function_in_external_process(self):
         try:
             self._prepare_remote_directory()
             self._copy_delegate_before_image()
-            self._invoke_shell(self._ssh_command + self._command)
+            self._invoke_shell(self._compute_ssh_command_line() + self._command)
             self._copy_delegate_after_image()
         finally:
             self._cleanup_remote_directory()
+
 
     def _compute_command_line(self):
         self._compute_remote_file_names()
@@ -196,6 +210,10 @@ class SSHDelegate(SubprocessDelegate):
                             "--delegate-before", self._remote_delegate_before_image_name,
                             "--delegate-after", self._remote_delegate_after_image_name,
                             "--log-level", str(log.root.level)]
+    
+
+    def _compute_ssh_command_line(self):
+        return ["ssh", ("-t" if self._interactive else "-T"), f"{self._user}@{self._host}"]
 
 
     def _copy_delegate_before_image(self):
@@ -217,10 +235,10 @@ class SSHDelegate(SubprocessDelegate):
         self._remote_delegate_after_image_name  = os.path.join(self._remote_temporary_directory, os.path.basename(self._delegate_after_image_name))
         
     def _prepare_remote_directory(self):
-        self._invoke_shell(self._ssh_command + ["mkdir","-p", self._remote_temporary_directory])
+        self._invoke_shell(self._compute_ssh_command_line() + ["mkdir","-p", self._remote_temporary_directory])
 
     def _cleanup_remote_directory(self):
-        self._invoke_shell(self._ssh_command + ["rm","-rf", self._remote_temporary_directory])
+        self._invoke_shell(self._compute_ssh_command_line() + ["rm","-rf", self._remote_temporary_directory])
 
 
 class SlurmDelegate(SubprocessDelegate):
@@ -228,16 +246,16 @@ class SlurmDelegate(SubprocessDelegate):
         super().__init__(*args, temporary_file_root=".", **kwargs)
 
     def _run_function_in_external_process(self):
-        command = ['salloc', 'srun'] + self._command
+        breakpoint()
+        command = ['salloc', 'srun'] + (["--pty"] if self._interactive else []) + self._command
         self._invoke_shell(command)
 
 
 class DockerDelegate(SubprocessDelegate):
 
-    def __init__(self, docker_image, *argc, interactive=False, **kwargs):
+    def __init__(self, docker_image, *argc, **kwargs):
         super().__init__(*argc, **kwargs)
         self._docker_image = docker_image
-        self._interactive = interactive
 
     def _run_function_in_external_process(self):
         log.debug(f"{self._temporary_file_root=}")
