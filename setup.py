@@ -29,6 +29,7 @@ setup(
     author="Steven Swanson",
     author_email="swanson@cs.ucsd.edu",
     packages=find_packages('src'),
+    install_requires=["pytest-explicit"],
     package_dir={'': 'src'},
     entry_points={
         'console_scripts' :[
