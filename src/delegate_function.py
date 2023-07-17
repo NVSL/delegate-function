@@ -49,7 +49,6 @@ class BaseDelegate:
         self._method = method
         self._argc = argc
         self._kwargs = kwargs
-        self._execute_debug_pre_hook()
         return self._do_invoke()
 
 
@@ -58,6 +57,7 @@ class BaseDelegate:
         Override this to implement your delegate's functionality.  This method should return the result of and cause the side-effects of
         :code:`self._delegated_inovke()`
         """
+        self._execute_debug_pre_hook()
         return self._delegated_invoke()
 
 
@@ -130,31 +130,31 @@ class SubprocessDelegate(BaseDelegate):
             delegate_before.flush()
             with tempfile.NamedTemporaryFile(dir=self._temporary_file_root, suffix=".after.pickle") as delegate_after:
                 self._delegate_after_image_name = delegate_after.name
-                self._command = self._compute_command_line()
                 self._run_function_in_external_process()
                 after = pickle.load(delegate_after)
-
                 self._obj.__dict__.update(after['delegate']._obj.__dict__)
                 return after['return_value']
 
 
-    def _compute_command_line(self):
-        return [shutil.which("delegate-function-run"),
-                            "--delegate-before", self._delegate_before_image_name,
-                            "--delegate-after", self._delegate_after_image_name,
-                            "--log-level", str(log.root.level)]
-
-
-    def _execute_shell(self):
-      #  breakpoint()
-        subprocess.run("bash")
+    def _compute_command_line(self):    
+        return [self._find_delegate_function_executable(),
+                "--delegate-before", self._delegate_before_image_name,
+                "--delegate-after", self._delegate_after_image_name,
+                "--log-level", str(log.root.level)]
 
 
     def _run_function_in_external_process(self):
-        self._invoke_shell(self._command)
+        command = self._compute_command_line()
+        self._invoke_shell(command)
 
 
     def _invoke_shell(self, cmd):
+        try:
+            os.environ['DELEGATE_FUNCTION_COMMAND'] = " ".join(cmd)
+            self._execute_debug_pre_hook()
+        finally:
+            del os.environ['DELEGATE_FUNCTION_COMMAND']
+
         try:
             log.debug(f"{type(self).__name__} Executing {' '.join(cmd)=}")
             r = subprocess.run(cmd, check=True)#, capture_output=True)
@@ -163,6 +163,16 @@ class SubprocessDelegate(BaseDelegate):
         except subprocess.CalledProcessError as e:
             raise DelegateFunctionException(f"Delegate subprocess execution failed ({type(self).__name__}): {e} {e.stdout and e.stdout.decode()} {e.stderr and e.stderr.decode()}")
 
+    def _execute_debug_pre_hook(self):
+        print(f"{self} trying to execute '{os.environ['DELEGATE_FUNCTION_COMMAND']}'")
+        super()._execute_debug_pre_hook()
+
+    def _find_delegate_function_executable(self):
+        exe = shutil.which("delegate-function-run")
+        if exe is None:
+            raise DelegateFunctionException(f"Delegate {self} on {platform.node()} can't find `delegate-function-run` executable in $PATH.")
+        return exe
+    
 
 class SudoDelegate(SubprocessDelegate):
 
@@ -179,11 +189,18 @@ class SudoDelegate(SubprocessDelegate):
         else:
             self._sudo_user_args = ['-u', self._user]
 
+    def _compute_command_line(self):
+        return ["sudo"] + self._sudo_args + self._sudo_user_args + super()._compute_command_line()
+    
+#        [shutil.which("delegate-function-run"),
+#                            "--delegate-before", self._delegate_before_image_name,
+#                            "--delegate-after", self._delegate_after_image_name,
+#                            "--log-level", str(log.root.level)]
 
     def _run_function_in_external_process(self):
         os.chmod(self._delegate_before_image_name, 0o444)
         os.chmod(self._delegate_after_image_name, 0o666)
-        command = ["sudo"] + self._sudo_args + self._sudo_user_args + self._command
+        command = self._compute_command_line()
         self._invoke_shell(command)
 
 
@@ -196,17 +213,18 @@ class SSHDelegate(SubprocessDelegate):
 
     def _run_function_in_external_process(self):
         try:
+            self._compute_remote_file_names()
             self._prepare_remote_directory()
             self._copy_delegate_before_image()
-            self._invoke_shell(self._compute_ssh_command_line() + self._command)
+            #breakpoint()
+            self._invoke_shell(self._compute_command_line())
             self._copy_delegate_after_image()
         finally:
             self._cleanup_remote_directory()
 
 
     def _compute_command_line(self):
-        self._compute_remote_file_names()
-        return [shutil.which("delegate-function-run"),
+        return self._compute_ssh_command_line() + [self._find_delegate_function_executable(),
                             "--delegate-before", self._remote_delegate_before_image_name,
                             "--delegate-after", self._remote_delegate_after_image_name,
                             "--log-level", str(log.root.level)]
@@ -245,9 +263,11 @@ class SlurmDelegate(SubprocessDelegate):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, temporary_file_root=".", **kwargs)
 
+    def _compute_command_line(self):
+        return ['salloc', 'srun'] + (["--pty"] if self._interactive else []) + super()._compute_command_line()
+    
     def _run_function_in_external_process(self):
-        breakpoint()
-        command = ['salloc', 'srun'] + (["--pty"] if self._interactive else []) + self._command
+        command = self._compute_command_line()
         self._invoke_shell(command)
 
 
@@ -257,29 +277,27 @@ class DockerDelegate(SubprocessDelegate):
         super().__init__(*argc, **kwargs)
         self._docker_image = docker_image
 
-    def _run_function_in_external_process(self):
-        log.debug(f"{self._temporary_file_root=}")
-#        self._root_replacement = root_replacement
-        self._docker_command = ['docker', 'run',
-                                '--workdir', '/tmp',
-                                *(["-it"] if self._interactive else []),
-                                '--entrypoint', '/usr/local/bin/docker-entrypoint.sh',                                
-                                #'--mount', f'type=bind,source={self._replace_root(os.getcwd())},dst={os.getcwd()}',
-                                #'--mount', f'type=bind,dst=/tmp,source={os.path.abspath(self._temporary_file_root)}',
-                                '--mount', f'type=volume,dst=/cfiddle_scratch,source=cfiddle-slurm_cfiddle_scratch',
-                                self._docker_image ]
-        log.debug(f"{self._docker_command + self._command=}")
-#        breakpoint()
-        self._invoke_shell(self._docker_command + self._command)
-
 
     def _compute_command_line(self):
         self._compute_remote_file_names()
-        return ["/opt/conda/bin/delegate-function-run",
-#            shutil.which("delegate-function-run"),
-                            "--delegate-before", self._docker_delegate_before_image_name,
-                            "--delegate-after", self._docker_delegate_after_image_name,
-                            "--log-level", str(log.root.level)]
+        return ['docker', 'run',
+                '--workdir', '/tmp',
+                *(["-it"] if self._interactive else []),
+                '--entrypoint', '/usr/local/bin/docker-entrypoint.sh',                                
+                '--mount', f'type=volume,dst=/cfiddle_scratch,source=cfiddle-slurm_cfiddle_scratch',
+                self._docker_image] +  [self._find_delegate_function_executable(), #"/opt/conda/bin/delegate-function-run",
+                "--delegate-before", self._docker_delegate_before_image_name,
+                "--delegate-after", self._docker_delegate_after_image_name,
+                "--log-level", str(log.root.level)]
+
+
+    def _run_function_in_external_process(self):
+        log.debug(f"{self._temporary_file_root=}")
+#        self._root_replacement = root_replacement
+#        self._docker_command =         log.debug(f"{self._docker_command + self._command=}")
+#        breakpoint()
+        command = self._compute_command_line()
+        self._invoke_shell(command)
 
 
     def _compute_remote_file_names(self):
@@ -349,7 +367,8 @@ class ShellCommandClass():
         self._args = args
         self._kwargs = kwargs
 
-    def run(self):    
+    def run(self):
+        log.debug(f"ShellComandClass executing {self._args} {self._kwargs}")
         subprocess.run(*self._args, **self._kwargs)
 
 class PDBClass():

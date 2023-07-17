@@ -22,9 +22,10 @@ def TestAlternateDirectorySubprocessDelegate():
     os.makedirs(".testing", exist_ok=True)
     return SubprocessDelegate(temporary_file_root=".testing")
 
-def TestDockerDelegate():
+def TestDockerDelegate(**kwargs):
     return DockerDelegate("cfiddle-slurm:21.08.6.1",
                           temporary_file_root='/cfiddle_scratch/',
+                          **kwargs
                           )
 
 
@@ -42,8 +43,7 @@ def TestSSHSlurmDelegate():
                        subdelegate=TestSlurmDelegate())
 
 def TestSlurmDockerDelegate():
-    return SlurmDelegate(interactive = kwargs.get("interactive", False),
-                         subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
+    return SlurmDelegate(subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
                                                         ))
 
 import platform
@@ -51,8 +51,8 @@ import platform
 def TestSSHDelegate():
     return SSHDelegate("test_fiddler", 
                        platform.node(), 
-                       subdelegate=TrivialDelegate(subdelegate=TrivialDelegate()))
-
+                       #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {})
+    )
 
 def TestSSHSudoDockerDelegate():
     return SSHDelegate(user="test_fiddler", 
@@ -80,6 +80,14 @@ def TestSSHSSHDelegate():
                                                 #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
                                                 ))
 
+def TestSSHSudoSlurmDockerDelegate():
+    return SSHDelegate(user="test_fiddler", 
+                       host=platform.node(),
+                       subdelegate=SudoDelegate(user="cfiddle", 
+                                                debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
+                                                subdelegate=TestSlurmDockerDelegate()))
+
+
 
 @pytest.fixture(scope="module",
                 params=[TestTrivialDelegate,
@@ -96,8 +104,9 @@ def TestSSHSSHDelegate():
                         TestSSHSudoDockerDelegate,
                         TestSSHSSHDelegate,
                         TestSSHSlurmDelegate,
-                     #   TestSSHSudoSlurmDelegate,
-                        #TestSlurmDockerDelegate
+                        #TestSSHSudoSlurmDelegate,
+                        TestSlurmDockerDelegate,
+                        TestSSHSudoSlurmDockerDelegate
                         ])
 def ADelegate(request):
     return request.param
