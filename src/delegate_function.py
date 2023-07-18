@@ -111,9 +111,10 @@ class TemporaryDirectoryDelegate(BaseDelegate):
 
 class SubprocessDelegate(BaseDelegate):
 
-    def __init__(self, *argc, temporary_file_root=None, **kwargs): 
+    def __init__(self, *argc, temporary_file_root=None, delegate_executable_path=None, **kwargs): 
         super().__init__(*argc, **kwargs)
-        self._temporary_file_root = temporary_file_root 
+        self._temporary_file_root = temporary_file_root
+        self._delegate_executable_path = delegate_executable_path 
     
     def _do_invoke(self):
 
@@ -164,10 +165,13 @@ class SubprocessDelegate(BaseDelegate):
             raise DelegateFunctionException(f"Delegate subprocess execution failed ({type(self).__name__}): {e} {e.stdout and e.stdout.decode()} {e.stderr and e.stderr.decode()}")
 
     def _execute_debug_pre_hook(self):
-        print(f"{self} trying to execute '{os.environ['DELEGATE_FUNCTION_COMMAND']}'")
+        if self._debug_pre_hook:
+            print(f"{self} trying to execute '{os.environ['DELEGATE_FUNCTION_COMMAND']}'")
         super()._execute_debug_pre_hook()
 
     def _find_delegate_function_executable(self):
+        if self._delegate_executable_path is not None:
+            return self._delegate_executable_path
         exe = shutil.which("delegate-function-run")
         if exe is None:
             raise DelegateFunctionException(f"Delegate {self} on {platform.node()} can't find `delegate-function-run` executable in $PATH.")
@@ -176,8 +180,18 @@ class SubprocessDelegate(BaseDelegate):
 
 class SudoDelegate(SubprocessDelegate):
 
+    """
+    Delegate a function to another user with :code:`sudo`.
+
+    Pitfalls:
+
+    1.  :code:`sudo` removes much of the environment by default.
+    2.  The delegate use access control lists to make the files it uses  (and the directories leading to them) readable, writable, and searchable by the target user.
+    
+    """
     def __init__(self, *args, user=None, sudo_args=None, **kwargs):
-        super().__init__(*args, temporary_file_root=".", **kwargs)
+
+        super().__init__(*args, **kwargs)
         
         if sudo_args is None:
             sudo_args = []
@@ -191,23 +205,23 @@ class SudoDelegate(SubprocessDelegate):
 
     def _compute_command_line(self):
         return ["sudo"] + self._sudo_args + self._sudo_user_args + super()._compute_command_line()
-    
-#        [shutil.which("delegate-function-run"),
-#                            "--delegate-before", self._delegate_before_image_name,
-#                            "--delegate-after", self._delegate_after_image_name,
-#                            "--log-level", str(log.root.level)]
 
     def _run_function_in_external_process(self):
-        os.chmod(self._delegate_before_image_name, 0o444)
-        os.chmod(self._delegate_after_image_name, 0o666)
+        self._invoke_shell(['setfacl', '-R', '-m', f'u:{self._user}:rwX', self._temporary_file_root])
         command = self._compute_command_line()
         self._invoke_shell(command)
 
 
 class SSHDelegate(SubprocessDelegate):
+    """
+    Pitfalls:
 
+    1.  Ideally, ssh should work without a password.
+    2.  It uses :code:`scp` to create a randomly named temporary directory on the remote host in :code:`/tmp` by default.  It attempts to clean up after itself, but there are no guarantees.
+
+    """
     def __init__(self, user, host, *args, **kwargs):
-        super().__init__(*args, temporary_file_root=".", **kwargs)
+        super().__init__(*args, **kwargs)
         self._user = user
         self._host = host
 
@@ -260,11 +274,21 @@ class SSHDelegate(SubprocessDelegate):
 
 
 class SlurmDelegate(SubprocessDelegate):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, temporary_file_root=".", **kwargs)
+
+    """
+    Pitfalls:
+
+    1.  Slurm requires a shared file system, and the :code:`temporary_file_root` needs to live in that file system.
+
+    """
+    def __init__(self, *args, temporary_file_root=None, **kwargs):
+        if temporary_file_root is None:
+            raise Exception("SlurmDelegate needs 'temporary_file_root' to point to directory in a file system shared between the executing host and Slurm cluster")
+        kwargs['temporary_file_root'] = temporary_file_root
+        super().__init__(*args, **kwargs)
 
     def _compute_command_line(self):
-        return ['salloc', 'srun'] + (["--pty"] if self._interactive else []) + super()._compute_command_line()
+        return ['salloc', 'srun', '--export=ALL'] + (["--pty"] if self._interactive else []) + super()._compute_command_line()
     
     def _run_function_in_external_process(self):
         command = self._compute_command_line()
@@ -273,7 +297,17 @@ class SlurmDelegate(SubprocessDelegate):
 
 class DockerDelegate(SubprocessDelegate):
 
-    def __init__(self, docker_image, *argc, **kwargs):
+    """
+    Pitfalls:
+
+    1.  Docker delegate requires a shared file system.  The :code:`temporary_file_root` needs to be reachable at the same location from outside and inside the docker container.
+
+    """
+
+    def __init__(self, docker_image, *argc, temporary_file_root=None, **kwargs):
+        if temporary_file_root is None:
+            raise Exception("DockerDelegate needs 'temporary_file_root' to point to directory visible at the same location inside and outside the docker container")
+        kwargs['temporary_file_root'] = temporary_file_root
         super().__init__(*argc, **kwargs)
         self._docker_image = docker_image
 

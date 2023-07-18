@@ -2,6 +2,7 @@ from delegate_function import *
 import os
 import pytest
 import pwd
+import shutil
 
 def TestTrivialDelegate():
     return TrivialDelegate()
@@ -25,6 +26,7 @@ def TestAlternateDirectorySubprocessDelegate():
 def TestDockerDelegate(**kwargs):
     return DockerDelegate("cfiddle-slurm:21.08.6.1",
                           temporary_file_root='/cfiddle_scratch/',
+                          delegate_executable_path=shutil.which('delegate-function-run'),
                           **kwargs
                           )
 
@@ -34,7 +36,7 @@ def TestSudoDelegate():
 
 
 def TestSlurmDelegate():
-    return SlurmDelegate()
+    return SlurmDelegate(temporary_file_root="/cfiddle_scratch/")
 
 
 def TestSSHSlurmDelegate():
@@ -43,7 +45,10 @@ def TestSSHSlurmDelegate():
                        subdelegate=TestSlurmDelegate())
 
 def TestSlurmDockerDelegate():
-    return SlurmDelegate(subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
+    return SlurmDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
+                         temporary_file_root="/cfiddle_scratch/",
+                         delegate_executable_path=shutil.which('delegate-function-run'),
+                         subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), 
                                                         ))
 
 import platform
@@ -54,12 +59,30 @@ def TestSSHDelegate():
                        #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {})
     )
 
+def TestSSHSudoDelegate():
+    return SSHDelegate(user="test_fiddler", 
+                       host=platform.node(), 
+                       subdelegate=SudoDelegate(user="cfiddle", #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
+                                                                               ))
+
 def TestSSHSudoDockerDelegate():
     return SSHDelegate(user="test_fiddler", 
                        host=platform.node(), 
                        subdelegate=SudoDelegate(user="cfiddle", 
                                                 subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
                                                                                )))
+
+def TestSudoDockerDelegate():
+    return SudoDelegate(user="cfiddle", 
+                   #     debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),
+                        subdelegate=TestDockerDelegate(#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {})
+        ))
+
+def TestSSHSudoTrivialDelegate():
+    return SSHDelegate(user="test_fiddler", 
+                       host=platform.node(), 
+                       subdelegate=SudoDelegate(user="cfiddle", 
+                                                subdelegate=TrivialDelegate()))
 
 def TestSSHDockerDelegate():
     return SSHDelegate(user="test_fiddler", 
@@ -84,7 +107,8 @@ def TestSSHSudoSlurmDockerDelegate():
     return SSHDelegate(user="test_fiddler", 
                        host=platform.node(),
                        subdelegate=SudoDelegate(user="cfiddle", 
-                                                debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
+                                                sudo_args=["--preserve-env"],
+                                                #debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}),   
                                                 subdelegate=TestSlurmDockerDelegate()))
 
 
@@ -102,9 +126,11 @@ def TestSSHSudoSlurmDockerDelegate():
                         TestSSHDelegate,
                         TestSSHDockerDelegate,        
                         TestSSHSudoDockerDelegate,
+                        TestSudoDockerDelegate,
+                        TestSSHSudoTrivialDelegate,
+                        TestSSHSudoDelegate,
                         TestSSHSSHDelegate,
                         TestSSHSlurmDelegate,
-                        #TestSSHSudoSlurmDelegate,
                         TestSlurmDockerDelegate,
                         TestSSHSudoSlurmDockerDelegate
                         ])
