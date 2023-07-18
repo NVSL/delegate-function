@@ -36,6 +36,9 @@ class BaseDelegate:
         if interactive:
             self.make_interactive()
 
+    def set_subdelegate(self, subdelegate):
+        self._subdelegate = subdelegate
+
     def make_interactive(self):
         self._make_chain_interactive()
 
@@ -91,6 +94,15 @@ class BaseDelegate:
 class TrivialDelegate(BaseDelegate):
     pass
 
+def DelegateChain(*argc):
+    def DelegateChainFactory():
+        next_delegate = None
+        for d_class in reversed(argc):
+            next_delegate = d_class(subdelegate=next_delegate)
+        return next_delegate
+    name = "".join(map(lambda x: x.__name__.replace("Delegate", ""), argc))
+    DelegateChain.__name__ = name
+    return DelegateChainFactory
 
 @contextmanager
 def working_directory(path):
@@ -190,7 +202,6 @@ class SudoDelegate(SubprocessDelegate):
     
     """
     def __init__(self, *args, user=None, sudo_args=None, **kwargs):
-
         super().__init__(*args, **kwargs)
         
         if sudo_args is None:
