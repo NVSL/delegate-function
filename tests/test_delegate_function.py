@@ -22,12 +22,15 @@ def TestDockerDelegate(**kwargs):
         return DockerDelegate("cfiddle-slurm:21.08.6.1",
                             temporary_file_root='/cfiddle_scratch/',
                             delegate_executable_path=shutil.which('delegate-function-run'),
+                            docker_cmd_line_args=['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', f'type=volume,dst=/cfiddle_scratch,source=delegate-function_cfiddle_scratch'],
                             subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
                             )
     r.__name__ = "TestDockerDelegateFactory"
     return r
+#GCCToolchain.is_toolchain_available(x)
+#from cfiddle.Toolchain.GCC import GCCToolchain
 
 def TestSudoDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
@@ -48,7 +51,7 @@ def TestSlurmDelegate(**kwargs):
                             **kwargs,
                             **morekwargs
                             )
-    r.__name__ = "TestSlumDelegateFactory"
+    r.__name__ = "TestSlurmDelegateFactory"
     return r
 
 def TestSSHDelegate(**kwargs):
@@ -68,6 +71,7 @@ def TestSSHDelegate(**kwargs):
                         TestSlurmDelegate(),
                         TestSudoDelegate(),
                         TestSSHDelegate(),
+                        TestDockerDelegate(),
                         DelegateChain(TestTrivialDelegate(),
                                       TestTrivialDelegate()),
                         DelegateChain(TestSubProcessDelegate(),

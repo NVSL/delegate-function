@@ -321,24 +321,28 @@ class DockerDelegate(SubprocessDelegate):
     Pitfalls:
 
     1.  Docker delegate requires a shared file system.  The :code:`temporary_file_root` needs to be reachable at the same location from outside and inside the docker container.
+    2.  `docker_cmd_line_args`  is a big security problem.
 
     """
 
-    def __init__(self, docker_image, *argc, temporary_file_root=None, **kwargs):
+    def __init__(self, docker_image, *argc, temporary_file_root=None, docker_cmd_line_args = None, **kwargs):
         if temporary_file_root is None:
             raise Exception("DockerDelegate needs 'temporary_file_root' to point to directory visible at the same location inside and outside the docker container")
         kwargs['temporary_file_root'] = temporary_file_root
         super().__init__(*argc, **kwargs)
         self._docker_image = docker_image
 
+        if docker_cmd_line_args is None:
+            docker_cmd_line_args = []
+
+        self._docker_cmd_line_args = docker_cmd_line_args
 
     def _compute_command_line(self):
         self._compute_remote_file_names()
         return ['docker', 'run',
                 '--workdir', '/tmp',
                 *(["-it"] if self._interactive else []),
-                '--entrypoint', '/usr/local/bin/docker-entrypoint.sh',                                
-                '--mount', f'type=volume,dst=/cfiddle_scratch,source=cfiddle-slurm_cfiddle_scratch',
+                *self._docker_cmd_line_args,
                 self._docker_image] +  [self._find_delegate_function_executable(), #"/opt/conda/bin/delegate-function-run",
                 "--delegate-before", self._docker_delegate_before_image_name,
                 "--delegate-after", self._docker_delegate_after_image_name,
