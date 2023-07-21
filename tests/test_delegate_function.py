@@ -4,85 +4,118 @@ import pytest
 import pwd
 import shutil
 
-def TestTrivialDelegate(subdelegate=None):
-    return TrivialDelegate(subdelegate=subdelegate)
+def TestTrivialDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return TrivialDelegate(subdelegate=subdelegate, **kwargs,
+                                **morekwargs)
+    r.__name__ = "TestTrivialDelegateFactory"
+    return r
 
-def TestSubProcessDelegate(subdelegate=None):
-    return SubprocessDelegate(subdelegate=subdelegate)
+def TestSubProcessDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return SubprocessDelegate(subdelegate=subdelegate, **kwargs, **morekwargs)
+    r.__name__ = "TestSubProcessDelegateFactory"
+    return r
 
-def TestDockerDelegate(subdelegate=None):
-    return DockerDelegate("cfiddle-slurm:21.08.6.1",
-                          temporary_file_root='/cfiddle_scratch/',
-                          delegate_executable_path=shutil.which('delegate-function-run'),
-                          subdelegate=subdelegate
-                          )
+def TestDockerDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return DockerDelegate("cfiddle-slurm:21.08.6.1",
+                            temporary_file_root='/cfiddle_scratch/',
+                            delegate_executable_path=shutil.which('delegate-function-run'),
+                            subdelegate=subdelegate,
+                            **kwargs,
+                            **morekwargs
+                            )
+    r.__name__ = "TestDockerDelegateFactory"
+    return r
 
-def TestSudoDelegate(subdelegate=None):
-    return SudoDelegate(user="cfiddle",
-                        delegate_executable_path=shutil.which('delegate-function-run'),
-                        subdelegate=subdelegate)
+def TestSudoDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return SudoDelegate(user="cfiddle",
+                            delegate_executable_path=shutil.which('delegate-function-run'),
+                            subdelegate=subdelegate,
+                            **kwargs,
+                            **morekwargs
+                            )
+    r.__name__ = "TestSudoDelegateFactory"
+    return r
 
-def TestSlurmDelegate(subdelegate=None):
-    return SlurmDelegate(temporary_file_root="/cfiddle_scratch/", 
-                         delegate_executable_path=shutil.which('delegate-function-run'),
-                         subdelegate=subdelegate)
+def TestSlurmDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return SlurmDelegate(temporary_file_root="/cfiddle_scratch/", 
+                            delegate_executable_path=shutil.which('delegate-function-run'),
+                            subdelegate=subdelegate,
+                            **kwargs,
+                            **morekwargs
+                            )
+    r.__name__ = "TestSlumDelegateFactory"
+    return r
 
-def TestSSHDelegate(subdelegate=None):
-    return SSHDelegate("test_fiddler", 
-                       platform.node(), 
-                       subdelegate=subdelegate)
+def TestSSHDelegate(**kwargs):
+    def r(subdelegate=None, **morekwargs):
+        return SSHDelegate("test_fiddler", 
+                        platform.node(), 
+                        subdelegate=subdelegate,
+                            **kwargs,
+                            **morekwargs
+                            )
+    r.__name__ = "TestSSHDelegateFactory"
+    return r
 
 @pytest.fixture(scope="module",
-                params=[TestTrivialDelegate,
-                        TestSubProcessDelegate,
-                        TestSlurmDelegate,
-                        TestSudoDelegate,
-                        TestSSHDelegate,
-                        DelegateChain(TestTrivialDelegate,
-                                      TestTrivialDelegate),
-                        DelegateChain(TestSubProcessDelegate,
-                                      TestTrivialDelegate),
-                        DelegateChain(TestTrivialDelegate,
-                                      TestSubProcessDelegate,
-                                      TestTrivialDelegate),
-                        DelegateChain(TestSSHDelegate,
-                                      TestDockerDelegate),
-                        DelegateChain(TestSudoDelegate,
-                                      TestDockerDelegate),
-                        DelegateChain(TestSSHDelegate, 
-                                      TestSudoDelegate,
-                                      TestDockerDelegate),
-                        DelegateChain(TestSudoDelegate,
-                                      TestDockerDelegate),
-                        DelegateChain(TestSSHDelegate,
-                                      TestSudoDelegate),
-                        DelegateChain(TestSSHDelegate,
-                                      TestSSHDelegate),
-                        DelegateChain(TestSSHDelegate,
-                                      TestSlurmDelegate),
-                        DelegateChain(TestSlurmDelegate,
-                                      TestDockerDelegate),
-                        DelegateChain(TestSSHDelegate,
-                                      TestSudoDelegate,
-                                      TestSlurmDelegate,
-                                      TestDockerDelegate
+                params=[TestTrivialDelegate(),
+                        TestSubProcessDelegate(),
+                        TestSlurmDelegate(),
+                        TestSudoDelegate(),
+                        TestSSHDelegate(),
+                        DelegateChain(TestTrivialDelegate(),
+                                      TestTrivialDelegate()),
+                        DelegateChain(TestSubProcessDelegate(),
+                                      TestTrivialDelegate()),
+                        DelegateChain(TestTrivialDelegate(),
+                                      TestSubProcessDelegate(),
+                                      TestTrivialDelegate()),
+                        DelegateChain(TestSSHDelegate(),
+                                      TestDockerDelegate()),
+                        DelegateChain(TestSudoDelegate(),
+                                      TestDockerDelegate()),
+                        DelegateChain(TestSSHDelegate(), 
+                                      TestSudoDelegate(),
+                                      TestDockerDelegate()),
+                        DelegateChain(TestSudoDelegate(),
+                                      TestDockerDelegate()),
+                        DelegateChain(TestSSHDelegate(),
+                                      TestSudoDelegate()),
+                        DelegateChain(TestSSHDelegate(),
+                                      TestSSHDelegate()),
+                        DelegateChain(TestSSHDelegate(),
+                                      TestSlurmDelegate()),
+                        DelegateChain(TestSlurmDelegate(),
+                                      TestDockerDelegate()),
+                        DelegateChain(TestSSHDelegate(),
+                                      TestSudoDelegate(),
+                                      TestSlurmDelegate(),
+                                      TestDockerDelegate()
                                       ),
-                        DelegateChain(TestSSHDelegate,
-                                      TestDockerDelegate
+                        DelegateChain(TestSSHDelegate(),
+                                      TestSlurmDelegate(),
+                                      TestSudoDelegate(),
+                                      TestDockerDelegate()
                                       ),
-                        DelegateChain(TestSlurmDelegate,
-                                      TestSlurmDelegate,
+                        DelegateChain(TestSSHDelegate(),
+                                      TestDockerDelegate()
                                       ),
-#                        DelegateChain(TestSlurmDelegate,
-#                                      TestSSHDelegate,
+                        DelegateChain(TestSlurmDelegate(),
+                                      TestSlurmDelegate(),
+                                      ),
+#                        DelegateChain(TestSlurmDelegate(),
+#                                      TestSSHDelegate(),
 #                                      ),
                        ])
 def ADelegate(request):
     return request.param
 
 def test_basic(ADelegate):
-    if ADelegate in [TestTrivialDelegate, TestTrivialNestedDelegate]:
-        pytest.skip("TrivialDelegate doesn't run in a different process")
     sd = ADelegate()
     f = TestClass()
     r = sd.invoke(f, "hello")
@@ -104,7 +137,7 @@ def test_mutable(ADelegate):
     assert f._value == 4
 
 def test_interactive():
-    sd = TestSSHSudoDockerDelegate()
+    sd = DelegateChain(TestTrivialDelegate(), TestTrivialDelegate())()
     assert not sd._interactive
     assert not sd._subdelegate._interactive
     sd.make_interactive()

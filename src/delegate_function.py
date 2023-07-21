@@ -20,14 +20,12 @@ class BaseDelegate:
     2.  No sub-delegate?
         a.  Then execute the function in my particular way.
     
-    As a consequence this means that the only delegate that should ever access or need the original invocation's arguments is the last delegate in the the chain.
+    As a consequence this means that the only delegate that should ever access or need the original invocation's arguments is the last delegate in the chain.
 
     :code:`debug_pre_hook` is a tuple with the same format as the arguments to :code:`invoke()`.  
     It'll be run before running the delegated function or invoking the delegate.  Passing 
-    :code:`(ShellCommandClass(['bash']), "run", [], {})` will get you a shell running in the delegate context.  
-    
+    :code:`(ShellCommandClass(['bash']), "run", [], {})` will get you a shell running in the delegate context.
     For some delegates, you may also need to pass :code:`interactive=True` to interact with the shell.
-    
     """
     def __init__(self, subdelegate=None, debug_pre_hook=None, interactive=False):
         self._subdelegate = subdelegate
@@ -94,11 +92,22 @@ class BaseDelegate:
 class TrivialDelegate(BaseDelegate):
     pass
 
-def DelegateChain(*argc):
+def DelegateChain(*argc, **kwargs):
+    
+    """
+    A convenience function for building chains of delegates.
+
+    It returns a factory function that returns delegate objects that you can use to make delegated function invocations.
+
+    :code:`argc` is the list of delegate factories to use to produce the delegate chain.
+
+    :code:`**kwargs` is passed to all the factories.
+
+    """
     def DelegateChainFactory():
         next_delegate = None
         for d_class in reversed(argc):
-            next_delegate = d_class(subdelegate=next_delegate)
+            next_delegate = d_class(subdelegate=next_delegate, **kwargs)
         return next_delegate
     name = "".join(map(lambda x: x.__name__.replace("Delegate", ""), argc))
     DelegateChain.__name__ = name
@@ -419,3 +428,11 @@ class ShellCommandClass():
 class PDBClass():
     def run(self):
         breakpoint()
+
+def shell_hook():
+    """
+    Convenience function for passing as :code:`debug_pre_hook` to the constructor of a subclass of :class:`SubProcessDelegate`.   
+
+    It'll give you a shell before the delegate executes each command.
+    """
+    return (ShellCommandClass(['bash']), "run", [], {})
