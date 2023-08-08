@@ -151,9 +151,11 @@ class SubprocessDelegate(BaseDelegate):
             pickle.dump(self, delegate_before)
             delegate_before.flush()
             with tempfile.NamedTemporaryFile(dir=self._temporary_file_root, suffix=".after.pickle") as delegate_after:
+                delegate_after.close()
                 self._delegate_after_image_name = delegate_after.name
                 self._run_function_in_external_process()
-                after = pickle.load(delegate_after)
+                with open(delegate_after.name, "rb") as da:
+                    after = pickle.load(da)
                 self._obj.__dict__.update(after['delegate']._obj.__dict__)
                 return after['return_value']
 
@@ -399,7 +401,7 @@ def do_delegate_function_run(delegate_before, delegate_after):
     try:
         delegate_object = pickle.load(delegate_before)
     except Exception as e:
-        raise DelegateFunctionException(f"Failed to load picked delegate: {e}")
+        raise DelegateFunctionException(f"Failed to load pickled delegate: {e}")
     r = delegate_object._delegated_invoke()
     pickle.dump(dict(delegate=delegate_object, return_value=r), delegate_after)
 #    os.chmod(delegate_after, 0o444)
