@@ -65,8 +65,7 @@ def TestSSHDelegate(**kwargs):
     r.__name__ = "TestSSHDelegateFactory"
     return r
 
-@pytest.fixture(scope="module",
-                params=[TestTrivialDelegate(),
+chains_to_test = [TestTrivialDelegate(),
                         TestSubProcessDelegate(),
                         TestSlurmDelegate(),
                         TestSudoDelegate(),
@@ -112,10 +111,22 @@ def TestSSHDelegate(**kwargs):
                         DelegateChain(TestSlurmDelegate(),
                                       TestSlurmDelegate(),
                                       ),
+                        DelegateChain(TestSlurmDelegate(),
+                                      TestSSHDelegate(),
+                                      ),
+                        DelegateChain(TestSlurmDelegate(),
+                                      TestSSHDelegate(),
+                                      TestSudoDelegate(),
+                                      TestDockerDelegate()
+                                      ),
 #                        DelegateChain(TestSlurmDelegate(),
 #                                      TestSSHDelegate(),
 #                                      ),
-                       ])
+                       ]
+
+@pytest.fixture(scope="module",
+                params=chains_to_test,
+                ids=map(lambda x: x.pytest_name if hasattr(x,"pytest_name") else str(x.__name__), chains_to_test))
 def ADelegate(request):
     return request.param
 

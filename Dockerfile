@@ -19,7 +19,7 @@ COPY ./testing-setup/slurmdbd.conf ./
 COPY ./testing-setup/install_slurm.sh ./
 RUN  ./install_slurm.sh
 
-COPY . /cse142L/delegate-function
+COPY . /cse142L/delegate-function   
 RUN (cd /cse142L/delegate-function; /opt/conda/bin/pip install -e .)
 #RUN ls /opt/conda/lib/python3.10/site-packages/cfiddle*
 #COPY ./install_cfiddle.sh ./

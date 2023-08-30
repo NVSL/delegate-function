@@ -34,6 +34,7 @@ class BaseDelegate:
         if interactive:
             self.make_interactive()
 
+
     def set_subdelegate(self, subdelegate):
         self._subdelegate = subdelegate
 
@@ -110,7 +111,8 @@ def DelegateChain(*argc, **kwargs):
             next_delegate = d_class(subdelegate=next_delegate, **kwargs)
         return next_delegate
     name = "".join(map(lambda x: x.__name__.replace("Delegate", ""), argc))
-    DelegateChain.__name__ = name
+    DelegateChainFactory.__name__ = name
+    DelegateChainFactory.pytest_name = "_to_".join(map(lambda x:x.__name__, argc))
     return DelegateChainFactory
 
 @contextmanager
@@ -321,7 +323,8 @@ class DockerDelegate(SubprocessDelegate):
     Pitfalls:
 
     1.  Docker delegate requires a shared file system.  The :code:`temporary_file_root` needs to be reachable at the same location from outside and inside the docker container.
-    2.  `docker_cmd_line_args`  is a big security problem.
+    2.  `docker_cmd_line_args` is a big security problem. as are any other constructor arguments that control how docker executes.  We probably need a trusted configuration file 
+        somewhere that we load to determine how docker should be run.  How do we specify where the config file should live?
 
     """
 
@@ -337,12 +340,15 @@ class DockerDelegate(SubprocessDelegate):
 
         self._docker_cmd_line_args = docker_cmd_line_args
 
+    def get_docker_cmd_line_args(self):
+        return self._docker_cmd_line_args
+    
     def _compute_command_line(self):
         self._compute_remote_file_names()
         return ['docker', 'run',
                 '--workdir', '/tmp',
                 *(["-it"] if self._interactive else []),
-                *self._docker_cmd_line_args,
+                *self.get_docker_cmd_line_args(),
                 self._docker_image] +  [self._find_delegate_function_executable(), #"/opt/conda/bin/delegate-function-run",
                 "--delegate-before", self._docker_delegate_before_image_name,
                 "--delegate-after", self._docker_delegate_after_image_name,
