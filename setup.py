@@ -28,9 +28,8 @@ setup(
     url="https://github.com/NVSL/delegate-function",
     author="Steven Swanson",
     author_email="swanson@cs.ucsd.edu",
-    packages=find_packages('src'),
+    py_modules=["delegate_function"],
     install_requires=["pytest-explicit"],
-    package_dir={'': 'src'},
     entry_points={
         'console_scripts' :[
             'delegate-function-run=delegate_function:delegate_function_run'
