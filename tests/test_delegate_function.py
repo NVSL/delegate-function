@@ -20,9 +20,9 @@ def TestSubProcessDelegate(**kwargs):
 def TestDockerDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
         return DockerDelegate("cfiddle-slurm:21.08.6.1",
-                            temporary_file_root='/cfiddle_scratch/',
+                            temporary_file_root='/scratch/',
                             delegate_executable_path=shutil.which('delegate-function-run'),
-                            docker_cmd_line_args=['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', f'type=volume,dst=/cfiddle_scratch,source=delegate-function_cfiddle_scratch'],
+                            docker_cmd_line_args=['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', f'type=volume,dst=/scratch,source=cse141pp-root_shared_scratch'],
                             subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
@@ -45,8 +45,8 @@ def TestSudoDelegate(**kwargs):
 
 def TestSlurmDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
-        return SlurmDelegate(temporary_file_root="/cfiddle_scratch/", 
-                            delegate_executable_path=shutil.which('delegate-function-run'),
+        return SlurmDelegate(temporary_file_root="/scratch/", 
+                            delegate_executable_path="/opt/conda/bin/delegate-function-run",
                             subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
@@ -57,7 +57,9 @@ def TestSlurmDelegate(**kwargs):
 def TestSSHDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
         return SSHDelegate("test_fiddler", 
-                        platform.node(), 
+                        "ssh-host", 
+                        delegate_executable_path="/opt/conda/bin/delegate-function-run",
+                        ssh_options=["-o", "StrictHostKeyChecking no"],
                         subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
@@ -66,11 +68,11 @@ def TestSSHDelegate(**kwargs):
     return r
 
 chains_to_test = [TestTrivialDelegate(),
-                  TestSubProcessDelegate(),
+                  TestSubProcessDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   TestSlurmDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   TestSudoDelegate(),
-                  TestSSHDelegate(),
-                  TestDockerDelegate(),
+                  TestSSHDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
+                  TestDockerDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   DelegateChain(TestTrivialDelegate(),
                                 TestTrivialDelegate()),
                   DelegateChain(TestSubProcessDelegate(),
@@ -78,7 +80,7 @@ chains_to_test = [TestTrivialDelegate(),
                 DelegateChain(TestTrivialDelegate(),
                                 TestSubProcessDelegate(),
                                 TestTrivialDelegate()),
-                DelegateChain(TestSSHDelegate(),
+                DelegateChain(TestSSHDelegate(debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                                 TestDockerDelegate()),
                 DelegateChain(TestSudoDelegate(),
                                 TestDockerDelegate()),

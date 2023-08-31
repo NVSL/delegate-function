@@ -244,10 +244,14 @@ class SSHDelegate(SubprocessDelegate):
     2.  It uses :code:`scp` to create a randomly named temporary directory on the remote host in :code:`/tmp` by default.  It attempts to clean up after itself, but there are no guarantees.
 
     """
-    def __init__(self, user, host, *args, **kwargs):
+    def __init__(self, user, host, *args, ssh_options=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._user = user
         self._host = host
+        if ssh_options is None:
+            ssh_options = []
+        self._ssh_options = ssh_options
+
 
     def _run_function_in_external_process(self):
         try:
@@ -269,7 +273,7 @@ class SSHDelegate(SubprocessDelegate):
     
 
     def _compute_ssh_command_line(self):
-        return ["ssh", ("-t" if self._interactive else "-T"), f"{self._user}@{self._host}"]
+        return ["ssh", *self._ssh_options, ("-t" if self._interactive else "-T"), f"{self._user}@{self._host}"]
 
 
     def _copy_delegate_before_image(self):

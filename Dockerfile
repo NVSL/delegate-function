@@ -19,8 +19,10 @@ COPY ./testing-setup/slurmdbd.conf ./
 COPY ./testing-setup/install_slurm.sh ./
 RUN  ./install_slurm.sh
 
-COPY . /cse142L/delegate-function   
-RUN (cd /cse142L/delegate-function; /opt/conda/bin/pip install -e .)
+RUN mkdir -p /build
+COPY . /build/delegate-function   
+RUN (cd /build/delegate-function; /opt/conda/bin/python -m pip install .)
+
 #RUN ls /opt/conda/lib/python3.10/site-packages/cfiddle*
 #COPY ./install_cfiddle.sh ./
 #RUN ./install_cfiddle.sh 
@@ -41,4 +43,3 @@ RUN chmod a+rwx /cfiddle_scratch
 
 ENTRYPOINT ["/opt/conda/bin/cfiddle_with_env.sh", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["slurmdbd"]
-      

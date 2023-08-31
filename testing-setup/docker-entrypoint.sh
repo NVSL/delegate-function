@@ -63,4 +63,12 @@ then
     exec /usr/sbin/slurmd -Dvvv
 fi
 
+if [ "$1" = "ssh" ]
+then
+    echo "---> Starting the MUNGE Authentication service (munged) ..."
+    service munge start
+    service ssh start
+    while true; do sleep 60;done
+fi
+
 exec "$@"

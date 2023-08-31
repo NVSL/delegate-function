@@ -75,7 +75,7 @@ services:
       - type: bind
         source: ${HOME}
         target: /root
-      - cfiddle_scratch:/cfiddle_scratch
+      - shared_scratch:/scratch
     expose:
       - "6818"
     depends_on:
@@ -106,11 +106,40 @@ services:
       - type: bind
         source: /home/swanson/CSE141pp-Root
         target: /cse142L
-      - cfiddle_scratch:/cfiddle_scratch
+      - shared_scratch:/scratch
     expose:
       - "6818"
     depends_on:
-      - "slurmctld"
+      - "slurmctld-srv"
+
+  ssh-srv:
+    image: cfiddle-slurm:21.08.6.1
+    command: ["ssh"]
+    hostname: ssh-host
+    networks:
+      - dev_connection
+    container_name: ssh-host
+    privileged: True
+    volumes:
+      - etc_munge:/etc/munge
+      - etc_slurm:/etc/slurm
+      - slurm_jobdir:/data
+      - var_log_slurm:/var/log/slurm
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: ${HOME}
+        target: /root
+      - type: bind
+        source: /home
+        target: /home
+      - type: bind
+        source: /home/swanson/CSE141pp-Root
+        target: /cse142L
+      - shared_scratch:/scratch
+    depends_on:
+      - "slurmctld-srv"
   
 volumes:
   etc_munge:
@@ -118,8 +147,9 @@ volumes:
   slurm_jobdir:
   var_lib_mysql:
   var_log_slurm:
-  cfiddle_venv:
-  cfiddle_scratch:
+  shared_scratch:
+    external: true
+    name: $SCRATCH
 
 networks:
   dev_connection:
