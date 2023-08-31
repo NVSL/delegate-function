@@ -66,62 +66,59 @@ def TestSSHDelegate(**kwargs):
     return r
 
 chains_to_test = [TestTrivialDelegate(),
-                        TestSubProcessDelegate(),
-                        TestSlurmDelegate(),
-                        TestSudoDelegate(),
-                        TestSSHDelegate(),
-                        TestDockerDelegate(),
-                        DelegateChain(TestTrivialDelegate(),
-                                      TestTrivialDelegate()),
-                        DelegateChain(TestSubProcessDelegate(),
-                                      TestTrivialDelegate()),
-                        DelegateChain(TestTrivialDelegate(),
-                                      TestSubProcessDelegate(),
-                                      TestTrivialDelegate()),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestDockerDelegate()),
-                        DelegateChain(TestSudoDelegate(),
-                                      TestDockerDelegate()),
-                        DelegateChain(TestSSHDelegate(), 
-                                      TestSudoDelegate(),
-                                      TestDockerDelegate()),
-                        DelegateChain(TestSudoDelegate(),
-                                      TestDockerDelegate()),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestSudoDelegate()),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestSSHDelegate()),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestSlurmDelegate()),
-                        DelegateChain(TestSlurmDelegate(),
-                                      TestDockerDelegate()),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestSudoDelegate(),
-                                      TestSlurmDelegate(),
-                                      TestDockerDelegate()
-                                      ),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestSlurmDelegate(),
-                                      TestSudoDelegate(),
-                                      TestDockerDelegate()
-                                      ),
-                        DelegateChain(TestSSHDelegate(),
-                                      TestDockerDelegate()
-                                      ),
-                        DelegateChain(TestSlurmDelegate(),
-                                      TestSlurmDelegate(),
-                                      ),
-                        DelegateChain(TestSlurmDelegate(),
-                                      TestSSHDelegate(),
-                                      ),
-                        DelegateChain(TestSlurmDelegate(),
-                                      TestSSHDelegate(),
-                                      TestSudoDelegate(),
-                                      TestDockerDelegate()
-                                      ),
-#                        DelegateChain(TestSlurmDelegate(),
-#                                      TestSSHDelegate(),
-#                                      ),
+                  TestSubProcessDelegate(),
+                  TestSlurmDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
+                  TestSudoDelegate(),
+                  TestSSHDelegate(),
+                  TestDockerDelegate(),
+                  DelegateChain(TestTrivialDelegate(),
+                                TestTrivialDelegate()),
+                  DelegateChain(TestSubProcessDelegate(),
+                                TestTrivialDelegate()),
+                DelegateChain(TestTrivialDelegate(),
+                                TestSubProcessDelegate(),
+                                TestTrivialDelegate()),
+                DelegateChain(TestSSHDelegate(),
+                                TestDockerDelegate()),
+                DelegateChain(TestSudoDelegate(),
+                                TestDockerDelegate()),
+                DelegateChain(TestSSHDelegate(), 
+                                TestSudoDelegate(),
+                                TestDockerDelegate()),
+                DelegateChain(TestSudoDelegate(),
+                                TestDockerDelegate()),
+                DelegateChain(TestSSHDelegate(),
+                                TestSudoDelegate()),
+                DelegateChain(TestSSHDelegate(),
+                                TestSSHDelegate()),
+                DelegateChain(TestSSHDelegate(),
+                                TestSlurmDelegate()),
+                DelegateChain(TestSlurmDelegate(),
+                                TestDockerDelegate()),
+                DelegateChain(TestSSHDelegate(),
+                                TestSudoDelegate(),
+                                TestSlurmDelegate(),
+                                TestDockerDelegate()
+                                ),
+                DelegateChain(TestSSHDelegate(),
+                                TestSlurmDelegate(),
+                                TestSudoDelegate(),
+                                TestDockerDelegate()
+                                ),
+                DelegateChain(TestSSHDelegate(),
+                                TestDockerDelegate()
+                                ),
+                DelegateChain(TestSlurmDelegate(interactive=True),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
+                                TestSlurmDelegate(debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
+                                ),
+                DelegateChain(TestSlurmDelegate(),
+                                TestSSHDelegate(),
+                                ),
+                DelegateChain(TestSlurmDelegate(),
+                                TestSSHDelegate(),
+                                TestSudoDelegate(),
+                                TestDockerDelegate()
+                                ),
                        ]
 
 @pytest.fixture(scope="module",
@@ -134,7 +131,6 @@ def test_basic(ADelegate):
     sd = ADelegate()
     f = TestClass()
     r = sd.invoke(f, "hello")
-#    assert r != os.getpid()
 
 @pytest.mark.slow
 def test_shell(ADelegate):
@@ -142,8 +138,6 @@ def test_shell(ADelegate):
     sd.make_interactive()
     f = ShellCommandClass(["bash"])
     sd.invoke(f, "run")
-
-
 
 def test_mutable(ADelegate):
     sd = ADelegate()

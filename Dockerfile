@@ -31,7 +31,8 @@ RUN useradd -g cfiddlers -p fiddle -G docker_users -s /usr/bin/bash test_fiddler
 RUN useradd -r -s /usr/sbin/nologin -u 7000 -G docker_users -p fiddle cfiddle 
 COPY ./testing-setup/cfiddle_sudoers /etc/sudoers.d
 
-RUN apt-get install -y openssh-server acl
+RUN apt-get update --fix-missing
+RUN apt-get install -y openssh-server acl && apt-get clean
 
 COPY ./testing-setup/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

@@ -1,9 +1,11 @@
-version: "2.2"
+version: "3.7"
 
 services:
-  mysql:
+  mysql-srv:
     image: mysql:5.7
     hostname: mysql
+    networks:
+      - dev_connection
     container_name: mysql
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
@@ -13,11 +15,13 @@ services:
     volumes:
       - var_lib_mysql:/var/lib/mysql
 
-  slurmdbd:
+  slurmdbd-srv:
     image: cfiddle-slurm:21.08.6.1
     build:
       context: .
     command: ["slurmdbd"]
+    networks:
+      - dev_connection
     container_name: slurmdbd
     hostname: slurmdbd
     volumes:
@@ -27,13 +31,15 @@ services:
     expose:
       - "6819"
     depends_on:
-      - mysql
+      - "mysql-srv"
 
-  slurmctld:
+  slurmctld-srv:
     image: cfiddle-slurm:21.08.6.1
     command: ["slurmctld"]
     container_name: slurmctld
     hostname: slurmctld
+    networks:
+      - dev_connection
     volumes:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
@@ -42,13 +48,15 @@ services:
     expose:
       - "6817"
     depends_on:
-      - "slurmdbd"
+      - "slurmdbd-srv"
 
-  c1:
+  c1-srv:
     image: cfiddle-slurm:21.08.6.1
     command: ["slurmd"]
     hostname: c1
     container_name: c1
+    networks:
+      - dev_connection
     privileged: True
     volumes:
       - etc_munge:/etc/munge
@@ -71,12 +79,14 @@ services:
     expose:
       - "6818"
     depends_on:
-      - "slurmctld"
+      - "slurmctld-srv"
 
-  c2:
+  c2-srv:
     image: cfiddle-slurm:21.08.6.1
     command: ["slurmd"]
     hostname: c2
+    networks:
+      - dev_connection
     container_name: c2
     privileged: True
     volumes:
@@ -101,37 +111,7 @@ services:
       - "6818"
     depends_on:
       - "slurmctld"
-
-  cfiddle-dev:
-    image: cfiddle-slurm:21.08.6.1
-    command: ["slurmd"]
-    hostname: cfiddle-dev
-    container_name: cfiddle-dev
-    privileged: True
-    volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
-      - slurm_jobdir:/data
-      - var_log_slurm:/var/log/slurm
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-      - type: bind
-        source: /home/swanson/CSE141pp-Root
-        target: /cse142L
-      - type: bind
-        source: ${HOME}
-        target: /root
-      - type: bind
-        source: /home
-        target: /home
-      - cfiddle_scratch:/cfiddle_scratch
-
-    expose:
-      - "8888"
-    depends_on:
-      - "slurmctld"
-   
+  
 volumes:
   etc_munge:
   etc_slurm:
@@ -140,3 +120,8 @@ volumes:
   var_log_slurm:
   cfiddle_venv:
   cfiddle_scratch:
+
+networks:
+  dev_connection:
+    name: $DEV_NETWORK
+    external: true
