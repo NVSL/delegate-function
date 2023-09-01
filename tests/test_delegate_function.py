@@ -13,7 +13,9 @@ def TestTrivialDelegate(**kwargs):
 
 def TestSubProcessDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
-        return SubprocessDelegate(subdelegate=subdelegate, **kwargs, **morekwargs)
+        return SubprocessDelegate(subdelegate=subdelegate, 
+                                  delegate_executable_path="/opt/conda/bin/delegate-function-run",
+                                  **kwargs, **morekwargs)
     r.__name__ = "TestSubProcessDelegateFactory"
     return r
 
@@ -21,7 +23,7 @@ def TestDockerDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
         return DockerDelegate("cfiddle-slurm:21.08.6.1",
                             temporary_file_root='/scratch/',
-                            delegate_executable_path=shutil.which('delegate-function-run'),
+                            delegate_executable_path="/opt/conda/bin/delegate-function-run",                                                          
                             docker_cmd_line_args=['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', f'type=volume,dst=/scratch,source=cse141pp-root_shared_scratch'],
                             subdelegate=subdelegate,
                             **kwargs,
@@ -35,7 +37,7 @@ def TestDockerDelegate(**kwargs):
 def TestSudoDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
         return SudoDelegate(user="cfiddle",
-                            delegate_executable_path=shutil.which('delegate-function-run'),
+                            delegate_executable_path="/opt/conda/bin/delegate-function-run",
                             subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
@@ -59,7 +61,7 @@ def TestSSHDelegate(**kwargs):
         return SSHDelegate("test_fiddler", 
                         "ssh-host", 
                         delegate_executable_path="/opt/conda/bin/delegate-function-run",
-                        ssh_options=["-o", "StrictHostKeyChecking no"],
+                        ssh_options=["-o", "StrictHostKeyChecking=off"],
                         subdelegate=subdelegate,
                             **kwargs,
                             **morekwargs
@@ -70,7 +72,8 @@ def TestSSHDelegate(**kwargs):
 chains_to_test = [TestTrivialDelegate(),
                   TestSubProcessDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   TestSlurmDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
-                  TestSudoDelegate(),
+                  # Sudo requires you to intstall delegate_function without -e.
+                  TestSudoDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   TestSSHDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   TestDockerDelegate(),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
                   DelegateChain(TestTrivialDelegate(),
@@ -80,8 +83,8 @@ chains_to_test = [TestTrivialDelegate(),
                 DelegateChain(TestTrivialDelegate(),
                                 TestSubProcessDelegate(),
                                 TestTrivialDelegate()),
-                DelegateChain(TestSSHDelegate(debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
-                                TestDockerDelegate()),
+                DelegateChain(TestSSHDelegate(),#interactive=True),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True),
+                                TestDockerDelegate()),#debug_pre_hook=(ShellCommandClass(['bash']), "run", [], {}), interactive=True)),
                 DelegateChain(TestSudoDelegate(),
                                 TestDockerDelegate()),
                 DelegateChain(TestSSHDelegate(), 

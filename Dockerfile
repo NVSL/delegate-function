@@ -20,7 +20,7 @@ COPY ./testing-setup/install_slurm.sh ./
 RUN  ./install_slurm.sh
 
 RUN mkdir -p /build
-COPY . /build/delegate-function   
+COPY . /build/delegate-function/
 RUN (cd /build/delegate-function; /opt/conda/bin/python -m pip install .)
 
 #RUN ls /opt/conda/lib/python3.10/site-packages/cfiddle*
@@ -38,8 +38,8 @@ RUN apt-get install -y openssh-server acl && apt-get clean
 
 COPY ./testing-setup/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p /cfiddle_scratch
-RUN chmod a+rwx /cfiddle_scratch
+RUN mkdir -p /scratch
+RUN chmod a+rwx /scratch
 
 ENTRYPOINT ["/opt/conda/bin/cfiddle_with_env.sh", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["slurmdbd"]

@@ -25,8 +25,8 @@ services:
     container_name: slurmdbd
     hostname: slurmdbd
     volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
+#      - etc_munge:/etc/munge
+#      - etc_slurm:/etc/slurm
       - var_log_slurm:/var/log/slurm
     expose:
       - "6819"
@@ -41,8 +41,8 @@ services:
     networks:
       - dev_connection
     volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
+#      - etc_munge:/etc/munge
+#      - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
     expose:
@@ -59,8 +59,8 @@ services:
       - dev_connection
     privileged: True
     volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
+#      - etc_munge:/etc/munge
+#      - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - type: bind
@@ -90,8 +90,8 @@ services:
     container_name: c2
     privileged: True
     volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
+#      - etc_munge:/etc/munge
+#      - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - type: bind
@@ -121,8 +121,8 @@ services:
     container_name: ssh-host
     privileged: True
     volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
+#      - etc_munge:/etc/munge
+#      - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
       - type: bind
@@ -142,8 +142,8 @@ services:
       - "slurmctld-srv"
   
 volumes:
-  etc_munge:
-  etc_slurm:
+#  etc_munge:
+#  etc_slurm:
   slurm_jobdir:
   var_lib_mysql:
   var_log_slurm:

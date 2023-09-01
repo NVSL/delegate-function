@@ -146,7 +146,7 @@ class SubprocessDelegate(BaseDelegate):
             #temporary_file_root = tempfile.TemporaryDirectory().name
             self._temporary_file_root = tempfile.mkdtemp()#tempfile.TemporaryDirectory() # keep the direcotry alive by holding a reference to it.
 
-
+   #     breakpoint()
         with tempfile.NamedTemporaryFile(dir=self._temporary_file_root, suffix=".before.pickle") as delegate_before:
             os.chmod(delegate_before.name, 0o666)
             self._delegate_before_image_name = delegate_before.name
