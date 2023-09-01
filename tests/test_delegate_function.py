@@ -1,8 +1,5 @@
 from delegate_function import *
-import os
 import pytest
-import pwd
-import shutil
 
 def TestTrivialDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
@@ -158,6 +155,3 @@ def test_interactive():
     assert sd._interactive
     assert sd._subdelegate._interactive
 
-@pytest.mark.parametrize("config", "test1.yml")
-def test_yaml(config):
-    print(config)

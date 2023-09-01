@@ -3,7 +3,7 @@ import pytest
 
 @pytest.mark.parametrize("config", ["test1.yml"])
 def test_yaml_file(config):
-    sd = DelegateGenerator().build_delegate(config)()
+    sd = DelegateGenerator(filename=config)
     f = TestClass()
     sd.invoke(f, "hello")
     
@@ -94,6 +94,6 @@ def SomeYAML(request):
     return request.param
 
 def test_yaml_string(SomeYAML):
-    sd = DelegateGenerator().build_delegate(yaml=SomeYAML)()
+    sd = DelegateGenerator(yaml=SomeYAML)
     f = TestClass()
     sd.invoke(f, "hello")

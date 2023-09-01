@@ -385,9 +385,9 @@ class DockerDelegate(SubprocessDelegate):
 class DelegateFunctionException(Exception):
     pass
 
-class DelegateGenerator():
+class DelegateGenerator(BaseDelegate):
 
-    def build_delegate(self, filename=None, yaml=None):
+    def __init__(self, filename=None, yaml=None):
         if filename is not None and yaml is not None:
             raise Exception("You can't specify both filename and yaml")
         if filename is not None:
@@ -398,9 +398,25 @@ class DelegateGenerator():
             raise Exception("You must specify either filename or yaml")
         
         self._delegates = [self._load_delegate(x) for x in self._spec['sequence']]
+
         print(self._delegates)
         print(f"spec:\n{json.dumps(self._spec, indent=4)}")
-        return DelegateChain(*self._delegates)
+        self._wrapped_delegate = DelegateChain(*self._delegates)()
+
+    def set_subdelegate(self, subdelegate):
+        self._wrapped_delegate._set_subdelegate(subdelegate)
+
+    def make_interactive(self):
+        self._wrapped_delegate._make_interactive()
+
+    def invoke(self, obj, method, *argc, **kwargs):
+        self._wrapped_delegate.invoke(obj,method,*argc, **kwargs)
+        
+    def _do_invoke(self, *argc, **kwargs):
+        return self._wrapped_delegate._do_invoke(*argc, **kwargs)
+
+    def _delegated_invoke(self, *argc, **kwargs):
+        return self._wrapped_delegate._delegated_invoke(*argc, **kwargs)
 
     def _load_delegate(self, delegate_spec):
         c = eval(delegate_spec['type'])
@@ -418,6 +434,7 @@ class DelegateGenerator():
 
     def _load_spec_from_string(self, string):
         self._spec = yaml.load(string, Loader=yaml.Loader)
+    
 
 @click.command()
 @click.option('--delegate-before', required=True, help="File with the initial state of the delegate.")
