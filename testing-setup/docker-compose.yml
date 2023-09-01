@@ -18,7 +18,7 @@ services:
   slurmdbd-srv:
     image: cfiddle-slurm:21.08.6.1
     build:
-      context: .
+      context: ..
     command: ["slurmdbd"]
     networks:
       - dev_connection
