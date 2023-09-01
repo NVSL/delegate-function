@@ -1,4 +1,6 @@
 from contextlib import contextmanager
+import copy
+import json
 import shutil
 import subprocess
 import sys
@@ -9,6 +11,8 @@ import pickle
 import os
 import uuid 
 import platform
+
+import yaml
 
 class BaseDelegate:
 
@@ -103,7 +107,6 @@ def DelegateChain(*argc, **kwargs):
     :code:`argc` is the list of delegate factories to use to produce the delegate chain.
 
     :code:`**kwargs` is passed to all the factories.
-
     """
     def DelegateChainFactory():
         next_delegate = None
@@ -365,7 +368,7 @@ class DockerDelegate(SubprocessDelegate):
         log.debug(f"{self._temporary_file_root=}")
 #        self._root_replacement = root_replacement
 #        self._docker_command =         log.debug(f"{self._docker_command + self._command=}")
-#        breakpoint()
+#        breakpoint()p
         command = self._compute_command_line()
         self._invoke_shell(command)
 
@@ -378,8 +381,43 @@ class DockerDelegate(SubprocessDelegate):
         log.debug(f"{self._docker_delegate_before_image_name=}")        
         log.debug(f"{self._docker_delegate_after_image_name=}")        
 
+
 class DelegateFunctionException(Exception):
     pass
+
+class DelegateGenerator():
+
+    def build_delegate(self, filename=None, yaml=None):
+        if filename is not None and yaml is not None:
+            raise Exception("You can't specify both filename and yaml")
+        if filename is not None:
+            self._load_spec_from_file(filename)
+        elif yaml is not None:
+            self._load_spec_from_string(yaml)
+        else:
+            raise Exception("You must specify either filename or yaml")
+        
+        self._delegates = [self._load_delegate(x) for x in self._spec['sequence']]
+        print(self._delegates)
+        print(f"spec:\n{json.dumps(self._spec, indent=4)}")
+        return DelegateChain(*self._delegates)
+
+    def _load_delegate(self, delegate_spec):
+        c = eval(delegate_spec['type'])
+        def Factory(*argc, **kwargs):
+            args = copy.copy(delegate_spec)
+            del args['type']
+            return c(*argc, **args, **kwargs)
+        return Factory
+    
+    def _load_spec_from_file(self, filename):
+        self._spec_file = filename
+        with open(filename) as f:
+            d = f.read()
+            self._load_spec_from_string(d)
+
+    def _load_spec_from_string(self, string):
+        self._spec = yaml.load(string, Loader=yaml.Loader)
 
 @click.command()
 @click.option('--delegate-before', required=True, help="File with the initial state of the delegate.")

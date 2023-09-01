@@ -158,4 +158,6 @@ def test_interactive():
     assert sd._interactive
     assert sd._subdelegate._interactive
 
-                     
+@pytest.mark.parametrize("config", "test1.yml")
+def test_yaml(config):
+    print(config)
