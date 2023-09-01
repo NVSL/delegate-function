@@ -34,16 +34,10 @@ class BaseDelegate:
     def __init__(self, subdelegate=None, debug_pre_hook=None, interactive=False):
         self._subdelegate = subdelegate
         self._debug_pre_hook = debug_pre_hook
-        self._interactive = False
-        if interactive:
-            self.make_interactive()
-
+        self._interactive = interactive
 
     def set_subdelegate(self, subdelegate):
         self._subdelegate = subdelegate
-
-    def make_interactive(self):
-        self._make_chain_interactive()
 
     def invoke(self, obj, method, *argc, **kwargs):
         """ 
@@ -85,14 +79,6 @@ class BaseDelegate:
         else:
             log.debug(f"No pre_debug_hook for {self}")
 
-    def _set_interactive(self, interactive):
-        self._interactive = interactive
-
-    def _make_chain_interactive(self):
-        t = self
-        while t is not None:
-            t._set_interactive(True)
-            t = t._subdelegate
 
 class TrivialDelegate(BaseDelegate):
     pass
@@ -111,6 +97,9 @@ def DelegateChain(*argc, **kwargs):
     def DelegateChainFactory():
         next_delegate = None
         for d_class in reversed(argc):
+            if next_delegate and next_delegate._interactive:
+                kwargs["interactive"] = True
+
             next_delegate = d_class(subdelegate=next_delegate, **kwargs)
         return next_delegate
     name = "".join(map(lambda x: x.__name__.replace("Delegate", ""), argc))
@@ -399,15 +388,11 @@ class DelegateGenerator(BaseDelegate):
         
         self._delegates = [self._load_delegate(x) for x in self._spec['sequence']]
 
-        print(self._delegates)
-        print(f"spec:\n{json.dumps(self._spec, indent=4)}")
+
         self._wrapped_delegate = DelegateChain(*self._delegates)()
 
     def set_subdelegate(self, subdelegate):
         self._wrapped_delegate._set_subdelegate(subdelegate)
-
-    def make_interactive(self):
-        self._wrapped_delegate._make_interactive()
 
     def invoke(self, obj, method, *argc, **kwargs):
         self._wrapped_delegate.invoke(obj,method,*argc, **kwargs)

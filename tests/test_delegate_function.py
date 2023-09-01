@@ -151,7 +151,8 @@ def test_interactive():
     sd = DelegateChain(TestTrivialDelegate(), TestTrivialDelegate())()
     assert not sd._interactive
     assert not sd._subdelegate._interactive
-    sd.make_interactive()
+
+    sd = DelegateChain(TestTrivialDelegate(), TestTrivialDelegate(interactive=True))()
     assert sd._interactive
     assert sd._subdelegate._interactive
 
