@@ -1,5 +1,6 @@
 from delegate_function import *
 import pytest
+from pytest_mock import mocker
 
 def TestTrivialDelegate(**kwargs):
     def r(subdelegate=None, **morekwargs):
@@ -136,8 +137,7 @@ def test_basic(ADelegate):
 
 @pytest.mark.slow
 def test_shell(ADelegate):
-    sd = ADelegate()
-    sd.make_interactive()
+    sd = ADelegate(interactive=True)
     f = ShellCommandClass(["bash"])
     sd.invoke(f, "run")
 
@@ -155,4 +155,22 @@ def test_interactive():
     sd = DelegateChain(TestTrivialDelegate(), TestTrivialDelegate(interactive=True))()
     assert sd._interactive
     assert sd._subdelegate._interactive
+
+def test_interactive_disable(mocker):
+    hook = (ShellCommandClass(['true']), "run", [], {})
+    sd = TestTrivialDelegate(debug_pre_hook=hook)()
+    f = TestClass()
+    spy = mocker.spy(hook[0], "run")
+    sd.invoke(f, "set_value", 4)
+    assert spy.call_count == 0
+
+    try:
+        old = os.environ.get('DELEGATE_FUNCTION_DEBUG_ENABLED')
+        os.environ['DELEGATE_FUNCTION_DEBUG_ENABLED'] = 'yes'
+        sd.invoke(f, "set_value", 4)
+        assert spy.call_count == 1
+    finally:
+        del os.environ['DELEGATE_FUNCTION_DEBUG_ENABLED']
+        if old is not None:
+            os.environ['DELEGATE_FUNCTION_DEBUG_ENABLED'] = old
 

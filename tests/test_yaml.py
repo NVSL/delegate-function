@@ -97,3 +97,4 @@ def test_yaml_string(SomeYAML):
     sd = DelegateGenerator(yaml=SomeYAML)
     f = TestClass()
     sd.invoke(f, "hello")
+

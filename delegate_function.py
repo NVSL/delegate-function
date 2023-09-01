@@ -14,6 +14,20 @@ import platform
 
 import yaml
 
+def is_debug_enabled():
+    return os.environ.get("DELEGATE_FUNCTION_DEBUG_ENABLED") == "yes"
+
+if is_debug_enabled():
+    print("""
+##########################################################################
+#  WARNING: You have debugging hooks enabled.  This should not be done   #
+#  in production because it allows arbitrary execution of code anywhere  #
+#  along the chain of delegates.                                         #
+#                                                                        #
+#  To disable it, make sure the DELEGATE_FUNCTION_DEBUG_ENABLED          #
+#  environment variable is not set.                                      #
+##########################################################################
+          """)
 class BaseDelegate:
 
     """
@@ -28,13 +42,17 @@ class BaseDelegate:
 
     :code:`debug_pre_hook` is a tuple with the same format as the arguments to :code:`invoke()`.  
     It'll be run before running the delegated function or invoking the delegate.  Passing 
-    :code:`(ShellCommandClass(['bash']), "run", [], {})` will get you a shell running in the delegate context.
+    :code:`"SHELL"` will get you a shell running in the delegate context.
+
     For some delegates, you may also need to pass :code:`interactive=True` to interact with the shell.
     """
     def __init__(self, subdelegate=None, debug_pre_hook=None, interactive=False):
         self._subdelegate = subdelegate
+
         self._debug_pre_hook = debug_pre_hook
-        self._interactive = interactive
+        if self._debug_pre_hook == "SHELL":
+            self._debug_pre_hook = (ShellCommandClass(['bash']), "run", [], {})
+        self._interactive = interactive or self._debug_pre_hook
 
     def set_subdelegate(self, subdelegate):
         self._subdelegate = subdelegate
@@ -60,7 +78,6 @@ class BaseDelegate:
         self._execute_debug_pre_hook()
         return self._delegated_invoke()
 
-
     def _delegated_invoke(self):
 
         if self._subdelegate:
@@ -73,12 +90,14 @@ class BaseDelegate:
     def _execute_debug_pre_hook(self):
 
         if self._debug_pre_hook:
+            if not is_debug_enabled():
+                print("Executing debugging hooks is disabled in {self}.  Set 'DELEGATE_FUNCTION_DEBUG_ENABLED=yes' to allow it.  But beware the security consequences.")
+                return
             log.debug(f"{self} Invoking debug_pre_hook: {self._debug_pre_hook}")
             obj, meth, argc, kwargs  = self._debug_pre_hook
             getattr(obj, meth)(*argc, **kwargs)
         else:
             log.debug(f"No pre_debug_hook for {self}")
-
 
 class TrivialDelegate(BaseDelegate):
     pass
@@ -138,7 +157,6 @@ class SubprocessDelegate(BaseDelegate):
             #temporary_file_root = tempfile.TemporaryDirectory().name
             self._temporary_file_root = tempfile.mkdtemp()#tempfile.TemporaryDirectory() # keep the direcotry alive by holding a reference to it.
 
-   #     breakpoint()
         with tempfile.NamedTemporaryFile(dir=self._temporary_file_root, suffix=".before.pickle") as delegate_before:
             os.chmod(delegate_before.name, 0o666)
             self._delegate_before_image_name = delegate_before.name
