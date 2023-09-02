@@ -51,7 +51,7 @@ class BaseDelegate:
 
         self._debug_pre_hook = debug_pre_hook
         if self._debug_pre_hook == "SHELL":
-            self._debug_pre_hook = (ShellCommandClass(['bash']), "run", [], {})
+            self._debug_pre_hook = shell_hook()
         self._interactive = interactive or self._debug_pre_hook
 
     def set_subdelegate(self, subdelegate):
@@ -91,7 +91,7 @@ class BaseDelegate:
 
         if self._debug_pre_hook:
             if not is_debug_enabled():
-                print("Executing debugging hooks is disabled in {self}.  Set 'DELEGATE_FUNCTION_DEBUG_ENABLED=yes' to allow it.  But beware the security consequences.")
+                print(f"Executing debugging hooks is disabled in {self} on host {platform.node()}.  Set 'DELEGATE_FUNCTION_DEBUG_ENABLED=yes' to allow it.  But beware the security consequences.")
                 return
             log.debug(f"{self} Invoking debug_pre_hook: {self._debug_pre_hook}")
             obj, meth, argc, kwargs  = self._debug_pre_hook
@@ -187,6 +187,7 @@ class SubprocessDelegate(BaseDelegate):
     def _invoke_shell(self, cmd):
         try:
             os.environ['DELEGATE_FUNCTION_COMMAND'] = " ".join(cmd)
+            os.environ['DELEGATE_NAME'] = type(self).__name__ 
             self._execute_debug_pre_hook()
         finally:
             del os.environ['DELEGATE_FUNCTION_COMMAND']
@@ -200,8 +201,6 @@ class SubprocessDelegate(BaseDelegate):
             raise DelegateFunctionException(f"Delegate subprocess execution failed ({type(self).__name__}): {e} {e.stdout and e.stdout.decode()} {e.stderr and e.stderr.decode()}")
 
     def _execute_debug_pre_hook(self):
-        if self._debug_pre_hook:
-            print(f"{self} trying to execute '{os.environ['DELEGATE_FUNCTION_COMMAND']}'")
         super()._execute_debug_pre_hook()
 
     def _find_delegate_function_executable(self):
@@ -491,13 +490,18 @@ class TestClass():
         self._value = v
 
 class ShellCommandClass():
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, env=None, **kwargs):
         self._args = args
         self._kwargs = kwargs
+        self._env = env
+        if self._env == None:
+            self._env = {}
 
     def run(self):
         log.debug(f"ShellComandClass executing {self._args} {self._kwargs}")
-        subprocess.run(*self._args, **self._kwargs)
+        env = copy.copy(os.environ)
+        env.update(self._env)
+        subprocess.run(*self._args, **self._kwargs, env=env)
 
 class PDBClass():
     def run(self):
@@ -509,4 +513,5 @@ def shell_hook():
 
     It'll give you a shell before the delegate executes each command.
     """
-    return (ShellCommandClass(['bash']), "run", [], {})
+    
+    return (ShellCommandClass(['bash', '--norc'], env=dict(FOO="bar", PS1=r"$DELEGATE_NAME on host \h executing $DELEGATE_FUNCTION_COMMAND\n\h:\w\$ \[\]\[\]")), "run", [], {})

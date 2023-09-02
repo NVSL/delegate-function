@@ -1,5 +1,6 @@
 from delegate_function import *
 import pytest
+from util import env
 
 @pytest.mark.parametrize("config", ["test1.yml"])
 def test_yaml_file(config):
@@ -98,3 +99,17 @@ def test_yaml_string(SomeYAML):
     f = TestClass()
     sd.invoke(f, "hello")
 
+@pytest.mark.slow
+def test_yaml_shell_hook():
+    t = """
+version: 0.1
+sequence:
+  - type: SubprocessDelegate
+    delegate_executable_path: /opt/conda/bin/delegate-function-run
+    debug_pre_hook: SHELL
+"""
+    with env(DELEGATE_FUNCTION_DEBUG_ENABLED='yes'):
+      sd = DelegateGenerator(yaml=t)
+      f = TestClass()
+      sd.invoke(f, "hello")
+ 
