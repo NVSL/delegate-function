@@ -31,7 +31,6 @@ sequence:
     temporary_file_root: /scratch/
     delegate_executable_path: /opt/conda/bin/delegate-function-run
     docker_cmd_line_args: ['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', 'type=volume,dst=/scratch,source=cse141pp-root_shared_scratch']
-         
 """,
 ##################################
 """
@@ -98,6 +97,23 @@ def test_yaml_string(SomeYAML):
     sd = DelegateGenerator(yaml=SomeYAML)
     f = TestClass()
     sd.invoke(f, "hello")
+
+def test_env_vars():
+    with env(DOCKER_IMAGE="cfiddle-slurm:21.08.6.1"):
+        sd = DelegateGenerator(yaml=
+"""
+version: 0.1
+sequence: 
+  - type: DockerDelegate
+    docker_image: $DOCKER_IMAGE
+    temporary_file_root: /scratch/
+    delegate_executable_path: /opt/conda/bin/delegate-function-run
+    docker_cmd_line_args: ['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', 'type=volume,dst=/scratch,source=cse141pp-root_shared_scratch']
+"""
+)
+        f = TestClass()
+        assert sd._delegates[0]()._docker_image == os.environ['DOCKER_IMAGE']
+        sd.invoke(f, "hello")
 
 @pytest.mark.slow
 def test_yaml_shell_hook():

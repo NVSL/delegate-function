@@ -267,7 +267,6 @@ class SSHDelegate(SubprocessDelegate):
             self._compute_remote_file_names()
             self._prepare_remote_directory()
             self._copy_delegate_before_image()
-            #breakpoint()
             self._invoke_shell(self._compute_command_line())
             self._copy_delegate_after_image()
         finally:
@@ -405,7 +404,6 @@ class DelegateGenerator(BaseDelegate):
         
         self._delegates = [self._load_delegate(x) for x in self._spec['sequence']]
 
-
         self._wrapped_delegate = DelegateChain(*self._delegates)()
 
     def set_subdelegate(self, subdelegate):
@@ -425,6 +423,7 @@ class DelegateGenerator(BaseDelegate):
         def Factory(*argc, **kwargs):
             args = copy.copy(delegate_spec)
             del args['type']
+            args = self._expand_env_vars(args)
             return c(*argc, **args, **kwargs)
         return Factory
     
@@ -437,6 +436,15 @@ class DelegateGenerator(BaseDelegate):
     def _load_spec_from_string(self, string):
         self._spec = yaml.load(string, Loader=yaml.Loader)
     
+    def _expand_env_vars(self, m):
+        if isinstance(m, str):
+            return os.path.expandvars(m)
+        elif isinstance(m, list):
+            return [self._expand_env_vars(x) for x in m]
+        elif isinstance(m, dict):
+            return {k:self._expand_env_vars(v) for k,v in m.items()}
+        else:
+            return m
 
 @click.command()
 @click.option('--delegate-before', required=True, help="File with the initial state of the delegate.")
