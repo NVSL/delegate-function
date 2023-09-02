@@ -128,4 +128,5 @@ sequence:
       sd = DelegateGenerator(yaml=t)
       f = TestClass()
       sd.invoke(f, "hello")
- 
+
+

@@ -29,7 +29,8 @@ setup(
     author="Steven Swanson",
     author_email="swanson@cs.ucsd.edu",
     py_modules=["delegate_function"],
-    install_requires=["pytest-explicit"],
+    install_requires=["pytest-explicit",
+                      "dill"],
     entry_points={
         'console_scripts' :[
             'delegate-function-run=delegate_function:delegate_function_run'

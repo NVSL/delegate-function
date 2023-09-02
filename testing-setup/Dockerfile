@@ -11,12 +11,12 @@ RUN mkdir /slurm
 WORKDIR /slurm
 
 
-COPY ./SLURM_TAG ./
-COPY ./IMAGE_TAG ./
-COPY ./slurm.conf ./
-COPY ./slurmdbd.conf ./
+COPY testing-setup/SLURM_TAG ./
+COPY testing-setup/IMAGE_TAG ./
+COPY testing-setup/slurm.conf ./
+COPY testing-setup/slurmdbd.conf ./
 
-COPY ./install_slurm.sh ./
+COPY testing-setup/install_slurm.sh ./
 RUN  ./install_slurm.sh
 
 RUN mkdir -p /build
@@ -31,12 +31,12 @@ RUN groupadd cfiddlers
 RUN groupadd --gid 1001 docker_users
 RUN useradd -g cfiddlers -p fiddle -G docker_users -s /usr/bin/bash test_fiddler
 RUN useradd -r -s /usr/sbin/nologin -u 7000 -G docker_users -p fiddle cfiddle 
-COPY ./cfiddle_sudoers /etc/sudoers.d
+COPY testing-setup/cfiddle_sudoers /etc/sudoers.d
 
 RUN apt-get update --fix-missing
 RUN apt-get install -y openssh-server acl && apt-get clean
 
-COPY ./docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY testing-setup/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 RUN mkdir -p /scratch
 RUN chmod a+rwx /scratch

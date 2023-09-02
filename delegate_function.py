@@ -7,7 +7,7 @@ import sys
 import click
 import tempfile
 import logging as log
-import pickle
+import dill as pickle
 import os
 import uuid 
 import platform

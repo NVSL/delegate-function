@@ -19,6 +19,7 @@ services:
     image: cfiddle-slurm:21.08.6.1
     build:
       context: ..
+      dockerfile: testing-setup/Dockerfile
     command: ["slurmdbd"]
     networks:
       - dev_connection
