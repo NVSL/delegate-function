@@ -1,9 +1,9 @@
 from contextlib import contextmanager
 import copy
-import json
 import shutil
 import subprocess
 import sys
+from typing import Any
 import click
 import tempfile
 import logging as log
@@ -28,6 +28,7 @@ if is_debug_enabled():
 #  environment variable is not set.                                      #
 ##########################################################################
           """)
+    
 class BaseDelegate:
 
     """
@@ -210,7 +211,97 @@ class SubprocessDelegate(BaseDelegate):
         if exe is None:
             raise DelegateFunctionException(f"Delegate {self} on {platform.node()} can't find `delegate-function-run` executable in $PATH.")
         return exe
+
+class YAMLDelegate(BaseDelegate):
+    def __init__(self, configuration_file, *argc, **kwargs):
+        if 'debug_pre_hook' in kwargs:
+            raise DelegateFunctionException("YAMLDelegate doesn't accept 'debug_pre_hook'")
+        super().__init__(*argc, **kwargs)
+        self._configuration_file =  configuration_file
+
+    def __getattr__(self, __name: str) -> Any:
+        return getattr(self._target, __name)
     
+    def __setattr__(self, __name: str, __value: Any) -> None:
+        if __name in ["_debug_pre_hook", "_interactive", "_subdelegate", "_target", "_configuration_file"]:
+            super().__setattr__(__name, __value)
+        else:
+            setattr(self._target, __name, __value)
+    
+
+    def invoke(self, obj, method, *argc, **kwargs):
+        config_filename = self._compute_config_filename()
+        self._target = DelegateGenerator(filename=config_filename)
+        self._target.set_subdelegate(self._subdelegate)
+        return self._target.invoke(obj,method, *argc, **kwargs)
+
+    def _compute_config_filename(self):
+        return self._configuration_file
+
+class LateBoundYAMLDelegate(YAMLDelegate):
+    def __init__(self, *argc, **kwargs):
+        super().__init__(*argc, configuration_file=None, **kwargs)
+
+    def _compute_config_filename(self):
+#        return os.environ[self._configuration_file]
+        if "DELEGATE_FUNCTION_CONFIG" not in os.environ:
+            raise DelegateFunctionException(f"LateBoundYAMLDelegate requires the DELEGATE_FUNCTION_CONFIG enironment variable to be set at execution time.")
+        return os.environ["DELEGATE_FUNCTION_CONFIG"]
+    
+class SuDockerDelegate(SubprocessDelegate):
+
+    def __init__(self, docker_image, *argc, 
+                 docker_user=None,
+                 temporary_file_root=None, 
+                 sudo_args=None,
+                 docker_cmd_line_args = None,
+                 **kwargs):
+        
+        if temporary_file_root is None:
+            raise Exception("DockerDelegate needs 'temporary_file_root' to point to directory visible at the same location inside and outside the docker container")
+        
+        kwargs['temporary_file_root'] = temporary_file_root
+        super().__init__(*argc, **kwargs)
+
+        self._docker_image = docker_image
+
+        if docker_cmd_line_args is None:
+            docker_cmd_line_args = []
+
+        self._docker_cmd_line_args = docker_cmd_line_args
+        
+        if sudo_args is None:
+            sudo_args = []
+        self._sudo_args = sudo_args
+        self._docker_user = docker_user
+
+        if self._docker_user is None:
+            self._sudo_user_args = []
+        else:
+            self._sudo_user_args = ['-u', self._docker_user]
+
+    def _compute_command_line(self):
+        return self._compute_sudo_command_line() + self._compute_docker_command_line() + super()._compute_command_line()
+
+    def _compute_sudo_command_line(self):
+        return ["sudo"] + self._sudo_args + self._sudo_user_args
+
+    def _run_function_in_external_process(self):
+        log.debug(f"{self._temporary_file_root=}")
+        #self._invoke_shell(['setfacl', '-R', '-m', f'u:{self._user}:rwX', self._temporary_file_root])
+        command = self._compute_command_line()
+        self._invoke_shell(command)
+
+    def get_docker_cmd_line_args(self):
+        return self._docker_cmd_line_args
+    
+    def _compute_docker_command_line(self):
+        return ['docker', 'run',
+                '--workdir', '/tmp',
+                *(["-it"] if self._interactive else []),
+                *self.get_docker_cmd_line_args(),
+                self._docker_image]
+
 
 class SudoDelegate(SubprocessDelegate):
 
@@ -240,6 +331,7 @@ class SudoDelegate(SubprocessDelegate):
         return ["sudo"] + self._sudo_args + self._sudo_user_args + super()._compute_command_line()
 
     def _run_function_in_external_process(self):
+        # This is not right:  self._temporary_file_root is constant and shared among users, so make it writable by the user seems unwise
         self._invoke_shell(['setfacl', '-R', '-m', f'u:{self._user}:rwX', self._temporary_file_root])
         command = self._compute_command_line()
         self._invoke_shell(command)
@@ -407,7 +499,7 @@ class DelegateGenerator(BaseDelegate):
         self._wrapped_delegate = DelegateChain(*self._delegates)()
 
     def set_subdelegate(self, subdelegate):
-        self._wrapped_delegate._set_subdelegate(subdelegate)
+        self._wrapped_delegate.set_subdelegate(subdelegate)
 
     def invoke(self, obj, method, *argc, **kwargs):
         self._wrapped_delegate.invoke(obj,method,*argc, **kwargs)
@@ -419,7 +511,9 @@ class DelegateGenerator(BaseDelegate):
         return self._wrapped_delegate._delegated_invoke(*argc, **kwargs)
 
     def _load_delegate(self, delegate_spec):
-        c = eval(delegate_spec['type'])
+        c = globals().get(delegate_spec['type'])
+        if c is None or not issubclass(c, BaseDelegate):
+            raise DelegateFunctionException(f"Illegal delegate name: {delegate_spec['type']}")
         def Factory(*argc, **kwargs):
             args = copy.copy(delegate_spec)
             del args['type']
@@ -445,6 +539,7 @@ class DelegateGenerator(BaseDelegate):
             return {k:self._expand_env_vars(v) for k,v in m.items()}
         else:
             return m
+        
 
 @click.command()
 @click.option('--delegate-before', required=True, help="File with the initial state of the delegate.")

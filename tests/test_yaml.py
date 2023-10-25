@@ -76,6 +76,36 @@ sequence:
     delegate_executable_path: /opt/conda/bin/delegate-function-run
     ssh_options: ["-o", "StrictHostKeyChecking=no"]
 """
+,
+"""
+version: 0.1
+sequence:
+  - type: SuDockerDelegate
+    docker_image: cfiddle-slurm:21.08.6.1
+    docker_user: test_fiddler
+    temporary_file_root: /scratch/
+    delegate_executable_path: /opt/conda/bin/delegate-function-run
+    docker_cmd_line_args: ["--entrypoint", "/usr/local/bin/docker-entrypoint.sh", "--mount", "type=volume,dst=/scratch,source=cse141pp-root_shared_scratch"]
+"""
+,
+"""
+version: 0.1
+sequence:
+  - type: YAMLDelegate
+    configuration_file: trivial.yml
+"""
+,
+"""
+version: 0.1
+sequence: 
+  - type: SudoDelegate
+    user: cfiddle
+  - type: DockerDelegate
+    docker_image: cfiddle-slurm:21.08.6.1
+    temporary_file_root: /scratch/
+    delegate_executable_path: /opt/conda/bin/delegate-function-run
+    docker_cmd_line_args: ['--entrypoint', '/usr/local/bin/docker-entrypoint.sh', '--mount', 'type=volume,dst=/scratch,source=cse141pp-root_shared_scratch']
+""",
 ]
 
 def extract_ids(chains):
@@ -95,6 +125,23 @@ def SomeYAML(request):
 
 def test_yaml_string(SomeYAML):
     sd = DelegateGenerator(yaml=SomeYAML)
+    f = TestClass()
+    sd.invoke(f, "hello")
+
+def test_late_binding():
+  yaml = """
+version: 0.1
+sequence:
+  - type: LateBoundYAMLDelegate
+   # configuration_file: DELEGATE_FUNCTION_CONFIG
+"""
+  with env(DELEGATE_FUNCTION_CONFIG="trivial.yml"):
+    sd = DelegateGenerator(yaml=yaml)
+    f = TestClass()
+    sd.invoke(f, "hello")
+
+  with pytest.raises(DelegateFunctionException):
+    sd = DelegateGenerator(yaml=yaml)
     f = TestClass()
     sd.invoke(f, "hello")
 
@@ -130,3 +177,14 @@ sequence:
       sd.invoke(f, "hello")
 
 
+def test_type_check():
+    t = """
+version: 0.1
+sequence:
+  - type: foo
+"""
+    with pytest.raises(DelegateFunctionException):
+        sd = DelegateGenerator(yaml=t)
+        f = TestClass()
+        sd.invoke(f, "hello")
+   

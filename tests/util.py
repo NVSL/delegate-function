@@ -9,4 +9,5 @@ def env(**kwargs):
         os.environ.update(kwargs)
         yield
     finally:
+        os.environ.clear()
         os.environ.update(old)
